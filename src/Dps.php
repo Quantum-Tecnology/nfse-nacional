@@ -60,7 +60,7 @@ class Dps implements DpsInterface
         if (!empty($dps)) {
             $this->std = $this->propertiesToLower($dps);
             if (empty($this->std->version)) {
-                $this->std->version = '1.00';
+                $this->std->version = '1.01';
             }
             //$ver = str_replace('.', '_', $this->std->version);
             //$this->jsonschema = realpath("../storage/jsonSchemes/v$ver/rps.schema");
@@ -78,7 +78,7 @@ class Dps implements DpsInterface
 
         $this->init($std);
         $this->dps = $this->dom->createElement('DPS');
-        $this->dps->setAttribute('versao', '1.00');
+        $this->dps->setAttribute('versao', $this->std->version);
         $this->dps->setAttribute('xmlns', 'http://www.sped.fazenda.gov.br/nfse');
 
         $infdps_inner = $this->dom->createElement('infDPS');
@@ -1184,7 +1184,7 @@ if (isset($this->std->infdps->serv->atvevento)) {
 //        }
 
         $dps = $this->dom->createElement('DPS');
-        $dps->setAttribute('versao', '1.00');
+        $dps->setAttribute('versao', $this->std->version);
         $dps->setAttribute('xmlns', 'http://www.sped.fazenda.gov.br/nfse');
         $this->dps->appendChild($infdps_inner);
         $this->dom->appendChild($this->dps);
@@ -1202,7 +1202,7 @@ if (isset($this->std->infdps->serv->atvevento)) {
 
         $this->init($std);
         $this->evento = $this->dom->createElement('pedRegEvento');
-        $this->evento->setAttribute('versao', '1.00');
+        $this->evento->setAttribute('versao', $this->std->version);
         $this->evento->setAttribute('xmlns', 'http://www.sped.fazenda.gov.br/nfse');
 
         $infpedreg_inner = $this->dom->createElement('infPedReg');
@@ -1280,7 +1280,7 @@ if (isset($this->std->infdps->serv->atvevento)) {
         }
 
         $dps = $this->dom->createElement('DPS');
-        $dps->setAttribute('versao', '1.00');
+        $dps->setAttribute('versao', $this->std->version);
         $dps->setAttribute('xmlns', 'http://www.sped.fazenda.gov.br/nfse');
         $this->evento->appendChild($infpedreg_inner);
         $this->dom->appendChild($this->evento);

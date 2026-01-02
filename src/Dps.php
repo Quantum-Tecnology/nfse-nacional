@@ -1248,12 +1248,6 @@ if (isset($this->std->infdps->serv->atvevento)) {
             $this->std->infpedreg->chnfse,
             true
         );
-        $this->dom->addChild(
-            $infpedreg_inner,
-            'nPedRegEvento',
-            $this->std->npedregevento,
-            true
-        );
 
 
         if (isset($this->std->infpedreg->e101101)) {
@@ -1372,7 +1366,6 @@ if (isset($this->std->infdps->serv->atvevento)) {
         $string = 'PRE';
         $string .= $this->std->infpedreg->chnfse; //Chave de acesso da NFS-e (50) +
         $string .= $this->codigoEvento(); //Código do evento (6)
-        $string .= str_pad($this->std->npedregevento, 3, 0, STR_PAD_LEFT); //Número do Pedido de Registro do Evento (nPedRegEvento) (3)
         $this->preId = $string;
         return $string;
     }

@@ -14,7 +14,6 @@ try {
     $tools = new \Hadder\NfseNacional\Tools($configJson, $cert);
 
     $std = new stdClass();
-    $std->nPedRegEvento = 1; //Número do Pedido de Registro do Evento (nPedRegEvento) (3)
     $std->infPedReg = new stdClass();
     $std->infPedReg->chNFSe = '00000000000000000000000000000000000000000000000000'; //Chaveda NFS-e a qual o evento será vinculada.
     $std->infPedReg->CNPJAutor = '00000000000000';

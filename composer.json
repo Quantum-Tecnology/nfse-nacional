@@ -37,6 +37,10 @@
     "ext-zlib": "*",
     "ext-openssl": "*"
   },
+  "require-dev": {
+    "friendsofphp/php-cs-fixer": "^3.89",
+    "laravel/pint": "^1.0"
+  },
   "config": {
     "optimize-autoloader": true
   },

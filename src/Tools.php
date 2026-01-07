@@ -59,6 +59,32 @@ class Tools extends RestCurl
         if ($retorno) {
             return $retorno;
         }
+        if(empty($retorno)){
+            return $this->consultarDanfseNfse($chave);
+        }
+        return null;
+    }
+
+    /**
+     * Consulta o DANFSe via NFSe caso o serviço direto falhe
+     *
+     * @param string $chave
+     * @return array|binary|null
+     */
+    public function consultarDanfseNfse($chave)
+    {
+        $operacao = 'Certificado';
+        $retorno = $this->getData($operacao, null, 3);
+        if(isset($retorno) and isset($retorno['sucesso']) and $retorno['sucesso']==true){
+            $operacao = 'Notas/Download/DANFSe/'.$chave;
+            $retorno = $this->getData($operacao, null, 3);
+        }
+        if (isset($retorno['erro'])) {
+            return $retorno;
+        }
+        if ($retorno) {
+            return $retorno;
+        }
         return null;
     }
 

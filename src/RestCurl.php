@@ -14,6 +14,8 @@ class RestCurl extends RestBase
     const URL_SEFIN_PRODUCAO = 'https://sefin.nfse.gov.br/sefinnacional';
     const URL_ADN_HOMOLOGACAO = 'https://adn.producaorestrita.nfse.gov.br';
     const URL_ADN_PRODUCAO = 'https://adn.nfse.gov.br';
+    const URL_NFSE_HOMOLOGACAO = 'https://www.producaorestrita.nfse.gov.br/EmissorNacional';
+    const URL_NFSE_PRODUCAO = 'https://www.nfse.gov.br/EmissorNacional';
     private mixed $config;
     private string $url_api;
     private $connection_timeout = 30;
@@ -25,6 +27,7 @@ class RestCurl extends RestBase
     public string $responseHead;
     public string $responseBody;
     private string $requestHead;
+    private string $cookies = '';
 
     protected $canonical = [true, false, null, null];
 
@@ -83,6 +86,9 @@ class RestCurl extends RestBase
                 curl_setopt($oCurl, CURLOPT_POST, 1);
                 curl_setopt($oCurl, CURLOPT_POSTFIELDS, $data);
                 curl_setopt($oCurl, CURLOPT_HTTPHEADER, $parameters);
+            }elseif ($origem === 3 && !empty($this->cookies)) {
+                $parameters[] = 'Cookie: ' . $this->cookies;
+                curl_setopt($oCurl, CURLOPT_HTTPHEADER, $parameters);
             }
             $response = curl_exec($oCurl);
 
@@ -97,6 +103,11 @@ class RestCurl extends RestBase
             $contentType = curl_getinfo($oCurl, CURLINFO_CONTENT_TYPE);
             $this->responseHead = trim(substr($response, 0, $headsize));
             $this->responseBody = trim(substr($response, $headsize));
+            //detecta redirect, conseguiu logar com certificado na origem 3 e pega cookies
+            if($origem==3 and $httpcode==302) {
+                $this->captureCookies($this->responseHead, $origem);
+                return ['sucesso'=>true];
+            }
             if ($contentType == 'application/pdf') {
                 return $this->responseBody;
             } else {
@@ -221,7 +232,27 @@ class RestCurl extends RestBase
                     $this->url_api = self::URL_ADN_PRODUCAO;
                 }
                 break;
+            case 3: // NFSE
+                $this->url_api = self::URL_NFSE_HOMOLOGACAO;
+                if ($this->config->tpamb === 1) {
+                    $this->url_api = self::URL_NFSE_PRODUCAO;
+                }
+                break;
         }
 
+    }
+
+    private function captureCookies(string $headers, int $origem): void
+    {
+        if ($origem !== 3) {
+            return;
+        }
+        if (!preg_match_all('/^Set-Cookie:\s*([^;\r\n]*)/mi', $headers, $matches)) {
+            return;
+        }
+        $cookies = array_map('trim', $matches[1]);
+        if (!empty($cookies)) {
+            $this->cookies = implode('; ', $cookies);
+        }
     }
 }

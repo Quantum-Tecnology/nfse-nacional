@@ -116,7 +116,8 @@ class RestBase
         $this->certfile = $this->randomName();
         $ret            = true;
         // load private key pem
-        $private = $this->certificate->privateKey;
+
+        $private = (string) $this->certificate->privateKey;
         //        if ($this->encriptPrivateKey) {
         //            //replace private key pem with password
         //            $this->temppass = Strings::randomString(16);
@@ -133,7 +134,7 @@ class RestBase
         );
         $ret &= $this->filesystem->put(
             $this->pubfile,
-            $this->certificate->publicKey
+            (string) $this->certificate->publicKey
         );
         $ret &= $this->filesystem->put(
             $this->certfile,

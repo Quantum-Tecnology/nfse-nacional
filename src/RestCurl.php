@@ -16,19 +16,24 @@ class RestCurl extends RestBase
     public const URL_SEFIN_PRODUCAO    = 'https://sefin.nfse.gov.br/sefinnacional';
     public const URL_ADN_HOMOLOGACAO   = 'https://adn.producaorestrita.nfse.gov.br';
     public const URL_ADN_PRODUCAO      = 'https://adn.nfse.gov.br';
+    public const URL_NFSE_HOMOLOGACAO  = 'https://www.producaorestrita.nfse.gov.br/EmissorNacional';
+    public const URL_NFSE_PRODUCAO     = 'https://www.nfse.gov.br/EmissorNacional';
     public string $soaperror;
     public int $soaperror_code;
     public array $soapinfo;
     public string $responseHead;
     public string $responseBody;
 
-    protected $canonical = [true, false, null, null];
+    protected $canonical    = [true, false, null, null];
+    private string $cookies = '';
     private mixed $config;
     private string $url_api;
     private $connection_timeout = 30;
     private $timeout            = 30;
     private $httpver;
     private string $requestHead;
+    private string $temppass = '';
+    private string $security_level = '';
 
     public function __construct(string $config, Certificate $cert)
     {
@@ -88,6 +93,9 @@ class RestCurl extends RestBase
                 curl_setopt($oCurl, CURLOPT_POST, 1);
                 curl_setopt($oCurl, CURLOPT_POSTFIELDS, $data);
                 curl_setopt($oCurl, CURLOPT_HTTPHEADER, $parameters);
+            } elseif (3 === $origem && !empty($this->cookies)) {
+                $parameters[] = 'Cookie: ' . $this->cookies;
+                curl_setopt($oCurl, CURLOPT_HTTPHEADER, $parameters);
             }
             $response = curl_exec($oCurl);
 
@@ -103,6 +111,13 @@ class RestCurl extends RestBase
             $contentType        = curl_getinfo($oCurl, CURLINFO_CONTENT_TYPE);
             $this->responseHead = mb_trim(mb_substr($response, 0, $headsize));
             $this->responseBody = mb_trim(mb_substr($response, $headsize));
+
+            // detecta redirect, conseguiu logar com certificado na origem 3 e pega cookies
+            if (3 == $origem and 302 == $httpcode) {
+                $this->captureCookies($this->responseHead, $origem);
+
+                return ['sucesso' => true];
+            }
 
             if ('application/pdf' == $contentType) {
                 return $this->responseBody;
@@ -237,7 +252,31 @@ class RestCurl extends RestBase
                 }
 
                 break;
+            case 3: // NFSE
+                $this->url_api = self::URL_NFSE_HOMOLOGACAO;
+
+                if (1 === $this->config->tpamb) {
+                    $this->url_api = self::URL_NFSE_PRODUCAO;
+                }
+
+                break;
         }
 
+    }
+
+    private function captureCookies(string $headers, int $origem): void
+    {
+        if (3 !== $origem) {
+            return;
+        }
+
+        if (!preg_match_all('/^Set-Cookie:\s*([^;\r\n]*)/mi', $headers, $matches)) {
+            return;
+        }
+        $cookies = array_map('trim', $matches[1]);
+
+        if (!empty($cookies)) {
+            $this->cookies = implode('; ', $cookies);
+        }
     }
 }

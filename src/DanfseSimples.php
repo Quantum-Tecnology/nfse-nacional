@@ -1,6 +1,6 @@
 <?php
 
-namespace NFePHP\DA\NFSe;
+namespace Hadder\NfseNacional;
 
 use NFePHP\DA\Common\DaCommon;
 use NFePHP\DA\Legacy\Pdf;

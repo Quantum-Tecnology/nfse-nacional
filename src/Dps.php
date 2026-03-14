@@ -657,11 +657,97 @@ class Dps implements DpsInterface
                 'mdic',
                 $this->std->infdps->serv->comext->mdic
             );
-
         }
 
-        // TODO Fazer grupo lsadppu
-        // TODO Fazer grupo obra
+        // Monta grupo obra
+        if (isset($this->std->infdps->serv->obra)) {
+            $obra_inner = $this->dom->createElement('obra');
+            $serv_inner->appendChild($obra_inner);
+
+            // inscImobFisc (opcional)
+            if (isset($this->std->infdps->serv->obra->inscimobfisc)) {
+                $this->dom->addChild(
+                    $obra_inner,
+                    'inscImobFisc',
+                    $this->std->infdps->serv->obra->inscimobfisc,
+                    true
+                );
+            }
+
+            // cObra (normalmente obrigatório quando obra existir)
+            if (isset($this->std->infdps->serv->obra->cobra)) {
+                $this->dom->addChild(
+                    $obra_inner,
+                    'cObra',
+                    $this->std->infdps->serv->obra->cobra,
+                    true
+                );
+            }
+
+            // cCIB (validação do layout pode rejeitar se inválido)
+            if (isset($this->std->infdps->serv->obra->ccib)) {
+                $this->dom->addChild(
+                    $obra_inner,
+                    'cCIB',
+                    $this->std->infdps->serv->obra->ccib,
+                    true
+                );
+            }
+
+            // end (endereço nacional)
+            if (isset($this->std->infdps->serv->obra->end)) {
+                $end_obra_inner = $this->dom->createElement('end');
+                $obra_inner->appendChild($end_obra_inner);
+
+                if (isset($this->std->infdps->serv->obra->end->cep)) {
+                    $this->dom->addChild(
+                        $end_obra_inner,
+                        'CEP',
+                        $this->std->infdps->serv->obra->end->cep,
+                        true
+                    );
+                }
+
+                if (isset($this->std->infdps->serv->obra->end->xlgr)) {
+                    $this->dom->addChild(
+                        $end_obra_inner,
+                        'xLgr',
+                        $this->std->infdps->serv->obra->end->xlgr,
+                        true
+                    );
+                }
+
+                if (isset($this->std->infdps->serv->obra->end->nro)) {
+                    $this->dom->addChild(
+                        $end_obra_inner,
+                        'nro',
+                        $this->std->infdps->serv->obra->end->nro,
+                        true
+                    );
+                }
+
+                // xCpl (opcional)
+                if (isset($this->std->infdps->serv->obra->end->xcpl)) {
+                    $this->dom->addChild(
+                        $end_obra_inner,
+                        'xCpl',
+                        $this->std->infdps->serv->obra->end->xcpl,
+                        true
+                    );
+                }
+
+                if (isset($this->std->infdps->serv->obra->end->xbairro)) {
+                    $this->dom->addChild(
+                        $end_obra_inner,
+                        'xBairro',
+                        $this->std->infdps->serv->obra->end->xbairro,
+                        true
+                    );
+                }
+            }
+        }
+
+        //TODO Fazer grupo lsadppu
         if (isset($this->std->infdps->serv->atvevento)) {
             $atvEvento_inner = $this->dom->createElement('atvEvento');
             $serv_inner->appendChild($atvEvento_inner);
@@ -738,7 +824,8 @@ class Dps implements DpsInterface
                 }
             }
         }
-        // TODO Fazer grupo explRod
+        //TODO Fazer grupo explRod
+
 
         // Grupo de informações complementares disponível para todos os serviços prestados
         if (isset($this->std->infdps->serv->infocompl->iddoctec)) {
@@ -823,8 +910,25 @@ class Dps implements DpsInterface
             true
         );
 
-        // TODO Fazer grupo vDescCondIncond
-        // TODO Fazer grupo vDedRed
+        //TODO Fazer grupo vDescCondIncond
+		// Grupo vDescCondIncond (dentro de <valores>)
+		$vDescIncond = $this->std->infdps->valores->vdesccondincond->vdescincond ?? null;
+		$vDescCond   = $this->std->infdps->valores->vdesccondincond->vdesccond   ?? null;
+
+		// regra: considera vazio se null, string vazia, ou "0.00" (ajuste se quiser manter 0.00)
+		$temDescIncond = ($vDescIncond !== null && $vDescIncond !== '' && $vDescIncond !== '0.00');
+		$temDescCond   = ($vDescCond   !== null && $vDescCond   !== '' && $vDescCond   !== '0.00');
+
+		if ($temDescIncond || $temDescCond) {
+			$descontos_inner = $this->dom->createElement('vDescCondIncond');
+			$valores_inner->appendChild($descontos_inner);
+
+			$this->dom->addChild($descontos_inner, 'vDescIncond', $vDescIncond, false);
+			$this->dom->addChild($descontos_inner, 'vDescCond',   $vDescCond,   false);
+		}
+
+
+        //TODO Fazer grupo vDedRed
 
         $trib_inner = $this->dom->createElement('trib');
         $valores_inner->appendChild($trib_inner);
@@ -838,6 +942,25 @@ class Dps implements DpsInterface
             $this->std->infdps->valores->trib->tribmun->tribissqn,
             true
         );
+
+        if (isset($this->std->infdps->valores->trib->tribmun->tribissqn) && $this->std->infdps->valores->trib->tribmun->tribissqn == 
+                2 && isset($this->std->infdps->valores->trib->tribmun->tpimunidade)) {
+            $this->dom->addChild(
+                $tribmun_inner,
+                'tpImunidade',
+                $this->std->infdps->valores->trib->tribmun->tpimunidade,
+                true
+            );
+        }
+
+        if(isset($this->std->infdps->valores->trib->tribmun->tribissqn) && $this->std->infdps->valores->trib->tribmun->tribissqn == 3){
+            $this->dom->addChild(
+                $tribmun_inner,
+                'cPaisResult',
+                $this->std->infdps->valores->trib->tribmun->cpaisresult,
+                true
+            );
+        }
 
         if (isset($this->std->infdps->valores->trib->tribmun->tpretissqn)) {
             $this->dom->addChild(

@@ -14,10 +14,10 @@ class Tools extends RestCurl
         parent::__construct($config, $cert);
     }
 
-    public function consultarNfseChave($chave)
+    public function consultarNfseChave($chave, $encoding = true)
     {
-        $operacao = 'nfse/' . $chave;
-        $retorno  = $this->getData($operacao);
+        $operacao = str_replace("{chave}", $chave, $this->getOperation('consultar_nfse'));
+        $retorno = $this->getData($operacao);
 
         if (isset($retorno['erro'])) {
             return $retorno;
@@ -25,9 +25,8 @@ class Tools extends RestCurl
 
         if ($retorno) {
             $base_decode = base64_decode($retorno['nfseXmlGZipB64']);
-            $gz_decode   = gzdecode($base_decode);
-
-            return mb_convert_encoding($gz_decode, 'ISO-8859-1', 'UTF-8');
+            $gz_decode = gzdecode($base_decode);
+            return $encoding ? mb_convert_encoding($gz_decode, 'ISO-8859-1') : $gz_decode;
         }
 
         return null;
@@ -35,23 +34,25 @@ class Tools extends RestCurl
 
     public function consultarDpsChave($chave)
     {
-        $operacao = 'dps/' . $chave;
-        $retorno  = $this->getData($operacao);
+        $operacao = str_replace("{chave}", $chave, $this->getOperation('consultar_dps'));
+        $retorno = $this->getData($operacao);
 
         return $retorno;
     }
 
     public function consultarNfseEventos($chave, $tipoEvento = null, $nSequencial = null)
     {
-        $operacao = 'nfse/' . $chave . '/eventos';
-
-        if ($tipoEvento) {
-            $operacao .= '/' . $tipoEvento;
+        $operacao = str_replace("{chave}", $chave, $this->getOperation('consultar_eventos'));
+        if (!$tipoEvento) {
+            $operacao = str_replace("/{tipoEvento}/{nSequencial}", "", $operacao);
         }
+        $operacao = str_replace("{tipoEvento}", $tipoEvento, $operacao);
 
-        if ($nSequencial) {
-            $operacao .= '/' . $nSequencial;
+        if (!$nSequencial) {
+            $operacao = str_replace("/{nSequencial}", "", $operacao);
         }
+        $operacao = str_replace("{nSequencial}", $nSequencial, $operacao);
+
         $retorno = $this->getData($operacao);
 
         return $retorno;
@@ -59,8 +60,7 @@ class Tools extends RestCurl
 
     public function consultarDanfse(string $chave)
     {
-        $operacao = 'danfse/' . $chave;
-
+        $operacao = str_replace("{chave}", $chave, $this->getOperation('consultar_danfse'));
         $retorno = $this->getData($operacao, null, 2);
 
         if (isset($retorno['erro'])) {
@@ -87,12 +87,11 @@ class Tools extends RestCurl
      */
     public function consultarDanfseNfse($chave)
     {
-        $operacao = 'Certificado';
-        $retorno  = $this->getData($operacao, null, 3);
-
-        if (isset($retorno) and isset($retorno['sucesso']) and true == $retorno['sucesso']) {
-            $operacao = 'Notas/Download/DANFSe/' . $chave;
-            $retorno  = $this->getData($operacao, null, 3);
+        $operacao = $this->getOperation('consultar_danfse_nfse_certificado');
+        $retorno = $this->getData($operacao, null, 3);
+        if(isset($retorno) and isset($retorno['sucesso']) and $retorno['sucesso']==true){
+            $operacao = str_replace("{chave}", $chave, $this->getOperation('consultar_danfse_nfse_download'));
+            $retorno = $this->getData($operacao, null, 3);
         }
 
         if (isset($retorno['erro'])) {
@@ -116,8 +115,8 @@ class Tools extends RestCurl
         $dados   = [
             'dpsXmlGZipB64' => $data,
         ];
-        $retorno = $this->postData('nfse', json_encode($dados));
-
+        $operacao = $this->getOperation('emitir_nfse');
+        $retorno = $this->postData($operacao, json_encode($dados));
         return $retorno;
     }
 
@@ -133,9 +132,8 @@ class Tools extends RestCurl
         $dados   = [
             'pedidoRegistroEventoXmlGZipB64' => $data,
         ];
-        $operacao = 'nfse/' . $std->infPedReg->chNFSe . '/eventos';
-        $retorno  = $this->postData($operacao, json_encode($dados));
-
+        $operacao = str_replace("{chave}", $std->infPedReg->chNFSe, $this->getOperation('cancelar_nfse'));
+        $retorno = $this->postData($operacao, json_encode($dados));
         return $retorno;
     }
 

@@ -9,15 +9,35 @@ use Hadder\NfseNacional\Common\RestBase;
 use NFePHP\Common\Certificate;
 use NFePHP\Common\Exception\SoapException;
 use NFePHP\Common\Signer;
+use RuntimeException;
 
 class RestCurl extends RestBase
 {
-    public const URL_SEFIN_HOMOLOGACAO = 'https://sefin.producaorestrita.nfse.gov.br/SefinNacional';
-    public const URL_SEFIN_PRODUCAO    = 'https://sefin.nfse.gov.br/sefinnacional';
-    public const URL_ADN_HOMOLOGACAO   = 'https://adn.producaorestrita.nfse.gov.br';
-    public const URL_ADN_PRODUCAO      = 'https://adn.nfse.gov.br';
-    public const URL_NFSE_HOMOLOGACAO  = 'https://www.producaorestrita.nfse.gov.br/EmissorNacional';
-    public const URL_NFSE_PRODUCAO     = 'https://www.nfse.gov.br/EmissorNacional';
+    const DEFAULT_URLS = [
+        "sefin_homologacao" => "https://sefin.producaorestrita.nfse.gov.br/SefinNacional",
+        "sefin_producao" => "https://sefin.nfse.gov.br/sefinnacional",
+        "adn_homologacao" => "https://adn.producaorestrita.nfse.gov.br",
+        "adn_producao" => "https://adn.nfse.gov.br",
+        "nfse_homologacao" => "https://www.producaorestrita.nfse.gov.br/EmissorNacional",
+        "nfse_producao" => "https://www.nfse.gov.br/EmissorNacional"
+    ];
+    const DEFAULT_OPERATIONS = [
+        "consultar_nfse" => "nfse/{chave}",
+        "consultar_dps" => "dps/{chave}",
+        "consultar_eventos" => "nfse/{chave}/eventos/{tipoEvento}/{nSequencial}",
+        "consultar_danfse" => "danfse/{chave}",
+        "consultar_danfse_nfse_certificado" => "Certificado",
+        "consultar_danfse_nfse_download" => "Notas/Download/DANFSe/{chave}",
+        "emitir_nfse" => "nfse",
+        "cancelar_nfse" => "nfse/{chave}/eventos"
+    ];
+    private $urls = [];
+    private $operations = [];
+    private mixed $config;
+    private string $url_api;
+    private $connection_timeout = 30;
+    private $timeout = 30;
+    private $httpver;
     public string $soaperror;
     public int $soaperror_code;
     public array $soapinfo;
@@ -26,11 +46,6 @@ class RestCurl extends RestBase
 
     protected $canonical    = [true, false, null, null];
     private string $cookies = '';
-    private mixed $config;
-    private string $url_api;
-    private $connection_timeout = 30;
-    private $timeout            = 30;
-    private $httpver;
     private string $requestHead;
     private string $temppass = '';
     private string $security_level = '';
@@ -40,7 +55,40 @@ class RestCurl extends RestBase
         parent::__construct($cert);
         $this->config      = json_decode($config);
         $this->certificate = $cert;
-        //        $this->wsobj = $this->loadWsobj($this->config->cmun);
+        $configFile = __DIR__ . '/../storage/prefeituras.json';
+
+        $this->loadConfigOverrides($configFile, $this->config->prefeitura ?? null);
+    }
+
+    private function loadConfigOverrides($jsonFile, $context): void
+    {
+        $json = json_decode(file_get_contents($jsonFile) ?: "", true);
+
+        if (!is_array($json)) {
+            throw new RuntimeException("JSON inválido em $jsonFile");
+        }
+
+        $contextData = $json[$context] ?? [];
+
+        $this->urls = $this->mergeDefaults(self::DEFAULT_URLS, $contextData['urls'] ?? []);
+
+        $this->operations = $this->mergeDefaults(self::DEFAULT_OPERATIONS, $contextData['operations'] ?? []);
+
+    }
+
+    private function mergeDefaults(array $defaults, array $overrides): array
+    {
+        foreach ($overrides as $key => $value) {
+            if (array_key_exists($key, $defaults)) {
+                $defaults[$key] = $value;
+            }
+        }
+        return $defaults;
+    }
+
+    public function getOperation($operation)
+    {
+        return $this->operations[$operation];
     }
 
     /**
@@ -60,7 +108,11 @@ class RestCurl extends RestBase
                 "Content-length: $msgSize",
             ];
             $oCurl = curl_init();
-            curl_setopt($oCurl, CURLOPT_URL, $this->url_api . '/' . $operacao);
+            $api_url = $this->url_api;
+            if (strlen($operacao) > 0) {
+                $api_url .= '/' . $operacao;
+            }
+            curl_setopt($oCurl, CURLOPT_URL, $api_url);
             curl_setopt($oCurl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
             curl_setopt($oCurl, CURLOPT_CONNECTTIMEOUT, $this->connection_timeout);
             curl_setopt($oCurl, CURLOPT_TIMEOUT, $this->timeout);
@@ -93,7 +145,7 @@ class RestCurl extends RestBase
                 curl_setopt($oCurl, CURLOPT_POST, 1);
                 curl_setopt($oCurl, CURLOPT_POSTFIELDS, $data);
                 curl_setopt($oCurl, CURLOPT_HTTPHEADER, $parameters);
-            } elseif (3 === $origem && !empty($this->cookies)) {
+            } elseif ($origem === 3 && !empty($this->cookies)) {
                 $parameters[] = 'Cookie: ' . $this->cookies;
                 curl_setopt($oCurl, CURLOPT_HTTPHEADER, $parameters);
             }
@@ -106,16 +158,14 @@ class RestCurl extends RestBase
             if (is_array($ainfo)) {
                 $this->soapinfo = $ainfo;
             }
-            $headsize           = curl_getinfo($oCurl, CURLINFO_HEADER_SIZE);
-            $httpcode           = curl_getinfo($oCurl, CURLINFO_HTTP_CODE);
-            $contentType        = curl_getinfo($oCurl, CURLINFO_CONTENT_TYPE);
-            $this->responseHead = mb_trim(mb_substr($response, 0, $headsize));
-            $this->responseBody = mb_trim(mb_substr($response, $headsize));
-
-            // detecta redirect, conseguiu logar com certificado na origem 3 e pega cookies
-            if (3 == $origem and 302 == $httpcode) {
+            $headsize = curl_getinfo($oCurl, CURLINFO_HEADER_SIZE);
+            $httpcode = curl_getinfo($oCurl, CURLINFO_HTTP_CODE);
+            $contentType = curl_getinfo($oCurl, CURLINFO_CONTENT_TYPE);
+            $this->responseHead = trim(substr($response, 0, $headsize));
+            $this->responseBody = trim(substr($response, $headsize));
+            //detecta redirect, conseguiu logar com certificado na origem 3 e pega cookies
+            if ($origem == 3 and $httpcode == 302) {
                 $this->captureCookies($this->responseHead, $origem);
-
                 return ['sucesso' => true];
             }
 
@@ -150,7 +200,11 @@ class RestCurl extends RestBase
             ];
             //            $this->requestHead = implode("\n", $parameters);
             $oCurl = curl_init();
-            curl_setopt($oCurl, CURLOPT_URL, $this->url_api . '/' . $operacao);
+            $api_url = $this->url_api;
+            if (strlen($operacao) > 0) {
+                $api_url .= '/' . $operacao;
+            }
+            curl_setopt($oCurl, CURLOPT_URL, $api_url);
             curl_setopt($oCurl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
             curl_setopt($oCurl, CURLOPT_CONNECTTIMEOUT, $this->connection_timeout);
             curl_setopt($oCurl, CURLOPT_TIMEOUT, $this->timeout);
@@ -236,27 +290,23 @@ class RestCurl extends RestBase
     {
         switch ($origem) {
             case 1: // SEFIN
-            default:
-                $this->url_api = self::URL_SEFIN_HOMOLOGACAO;
-
-                if (1 === $this->config->tpamb) {
-                    $this->url_api = self::URL_SEFIN_PRODUCAO;
+                $this->url_api = $this->urls['sefin_homologacao'];
+                if ($this->config->tpamb === 1) {
+                    $this->url_api = $this->urls['sefin_producao'];
                 }
 
                 break;
             case 2: // ADN
-                $this->url_api = self::URL_ADN_HOMOLOGACAO;
-
-                if (1 === $this->config->tpamb) {
-                    $this->url_api = self::URL_ADN_PRODUCAO;
+                $this->url_api = $this->urls['adn_homologacao'];
+                if ($this->config->tpamb === 1) {
+                    $this->url_api = $this->urls['adn_producao'];
                 }
 
                 break;
             case 3: // NFSE
-                $this->url_api = self::URL_NFSE_HOMOLOGACAO;
-
-                if (1 === $this->config->tpamb) {
-                    $this->url_api = self::URL_NFSE_PRODUCAO;
+                $this->url_api = $this->urls['nfse_homologacao'];
+                if ($this->config->tpamb === 1) {
+                    $this->url_api = $this->urls['nfse_producao'];
                 }
 
                 break;

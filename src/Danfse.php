@@ -136,8 +136,7 @@ class Danfse extends DaCommon
     private function parseNfseData()
     {
         // Padrão Nacional SEFIN (mais comum - estrutura NFSe/infNFSe)
-
-        if (isset($this->nfseArray['infDPS'])) {
+        if (isset($this->nfseArray['infNFSe'])) {
             $this->parseNfseNacional();
         }
         // Padrão GINFES
@@ -160,8 +159,8 @@ class Danfse extends DaCommon
      */
     private function parseNfseNacional()
     {
-        $infNfse = $this->nfseArray['infDPS'] ?? [];
-        $dps = $infNfse['DPS']['infDPS'] ?? [];
+        $infNfse = $this->nfseArray['infNFSe'] ?? [];
+        $dps = $infNfse['DPS']['infNFSe'] ?? [];
 
         // Informações principais da NFSe
         $this->infNfse = [
@@ -527,7 +526,7 @@ class Danfse extends DaCommon
         $qrSize = 30;
         $qrX = $x + $this->wPrint - $qrSize - 2;
         $this->pdf->rect($qrX, $y + 2, $qrSize, $qrSize);
-        
+
         $idNfse = filter_var($this->infNfse['chave_acesso'], FILTER_SANITIZE_NUMBER_INT);
 
         $filename = 'qr-code_' . $idNfse . '.png';
@@ -1308,7 +1307,7 @@ class Danfse extends DaCommon
 
     protected function statusNFSe()
     {
-        $obj = (object) $this->nfseArray['infDPS'];
+        $obj = (object) $this->nfseArray['infNFSe'];
         $resp = [
             'status' => true,
             'message' => [],

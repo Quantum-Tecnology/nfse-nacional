@@ -160,7 +160,7 @@ class Danfse extends DaCommon
     private function parseNfseNacional()
     {
         $infNfse = $this->nfseArray['infNFSe'] ?? [];
-        $dps = $infNfse['DPS']['infNFSe'] ?? [];
+        $dps = $infNfse['DPS']['infDPS'] ?? [];
 
         // Informações principais da NFSe
         $this->infNfse = [
@@ -238,7 +238,9 @@ class Danfse extends DaCommon
         $serv = $dps['serv'] ?? [];
         $cServ = $serv['cServ'] ?? [];
         $locPrest = $serv['locPrest'] ?? [];
+
         $valores = $dps['valores'] ?? [];
+   
         $vServPrest = $valores['vServPrest'] ?? [];
         $trib = $valores['trib'] ?? [];
         $tribMun = $trib['tribMun'] ?? [];
@@ -246,6 +248,7 @@ class Danfse extends DaCommon
         
         // Valores do serviço
         $valorServico = (float)($vServPrest['vServ'] ?? 0);
+
         $valorDeducoes = (float)($vServPrest['vDed'] ?? 0);
         $valorDescontoIncond = (float)($vServPrest['vDesc'] ?? 0);
         $valorDescontoCond = (float)($vServPrest['vDescCond'] ?? 0);
@@ -266,6 +269,7 @@ class Danfse extends DaCommon
         
         // Valor líquido (vem do nível superior infNFSe/valores)
         $valoresNfse = $infNfse['valores'] ?? [];
+
         $vLiq = (float)($valoresNfse['vLiq'] ?? $valorServico);
         
         // Informações complementares

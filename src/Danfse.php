@@ -97,7 +97,7 @@ class Danfse extends DaCommon
     private function loadDoc($xml)
     {
         $this->xml = $xml;
-        
+
         if (empty($xml)) {
             throw new Exception('XML da NFSe não pode estar vazio!');
         }
@@ -115,15 +115,58 @@ class Danfse extends DaCommon
 
             // Converte para array para facilitar manipulação
             $stdClass = simplexml_load_string($xml);
+
             $json = json_encode($stdClass, JSON_OBJECT_AS_ARRAY);
             $this->nfseArray = json_decode($json, true);
 
             // Identifica a estrutura da NFSe (pode variar conforme o padrão)
             $this->parseNfseData();
 
+            // O FPDF legado trabalha com ISO-8859-1 em fontes core.
+            // Convertemos os campos textuais vindos do XML para evitar
+            // caracteres acentuados quebrados na visualização do PDF.
+            $this->normalizeDataEncodingForPdf();
+
         } catch (Exception $e) {
             throw new Exception('Erro ao carregar XML da NFSe: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Normaliza os dados textuais para o encoding esperado pelo motor de PDF.
+     *
+     * @return void
+     */
+    private function normalizeDataEncodingForPdf()
+    {
+        $this->infNfse = $this->convertDataToPdfEncoding($this->infNfse);
+        $this->prestador = $this->convertDataToPdfEncoding($this->prestador);
+        $this->tomador = $this->convertDataToPdfEncoding($this->tomador);
+        $this->servico = $this->convertDataToPdfEncoding($this->servico);
+    }
+
+    /**
+     * Converte recursivamente strings para ISO-8859-1.
+     *
+     * @param mixed $data
+     * @return mixed
+     */
+    private function convertDataToPdfEncoding($data)
+    {
+        if (is_array($data)) {
+            foreach ($data as $key => $value) {
+                $data[$key] = $this->convertDataToPdfEncoding($value);
+            }
+            return $data;
+        }
+
+        if (!is_string($data) || $data === '') {
+            return $data;
+        }
+
+        $text = html_entity_decode($data, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        return mb_convert_encoding($text, 'ISO-8859-1', ['UTF-8', 'windows-1252', 'ISO-8859-1']);
     }
 
     /**
@@ -160,7 +203,7 @@ class Danfse extends DaCommon
     {
         $infNfse = $this->nfseArray['infNFSe'] ?? [];
         $dps = $infNfse['DPS']['infDPS'] ?? [];
-        
+
         // Informações principais da NFSe
         $this->infNfse = [
             'numero' => $infNfse['nNFSe'] ?? $infNfse['nDFSe'] ?? 'S/N',
@@ -237,7 +280,9 @@ class Danfse extends DaCommon
         $serv = $dps['serv'] ?? [];
         $cServ = $serv['cServ'] ?? [];
         $locPrest = $serv['locPrest'] ?? [];
+
         $valores = $dps['valores'] ?? [];
+   
         $vServPrest = $valores['vServPrest'] ?? [];
         $trib = $valores['trib'] ?? [];
         $tribMun = $trib['tribMun'] ?? [];
@@ -245,6 +290,7 @@ class Danfse extends DaCommon
         
         // Valores do serviço
         $valorServico = (float)($vServPrest['vServ'] ?? 0);
+
         $valorDeducoes = (float)($vServPrest['vDed'] ?? 0);
         $valorDescontoIncond = (float)($vServPrest['vDesc'] ?? 0);
         $valorDescontoCond = (float)($vServPrest['vDescCond'] ?? 0);
@@ -265,6 +311,7 @@ class Danfse extends DaCommon
         
         // Valor líquido (vem do nível superior infNFSe/valores)
         $valoresNfse = $infNfse['valores'] ?? [];
+
         $vLiq = (float)($valoresNfse['vLiq'] ?? $valorServico);
         
         // Informações complementares

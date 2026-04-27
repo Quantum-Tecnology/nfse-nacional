@@ -45,8 +45,22 @@ class RestBase
     }
 
     /**
-     * Apenas para testes, seta a validação de validade do certificado.
-     *
+     * Verifica se o certificado é valido na data atual
+     * @param Certificate $certificate
+     * @return void
+     * @throws Certificate\Exception\Expired
+     */
+    private function isCertificateExpired(?Certificate $certificate = null)
+    {
+        if (!$this->disableCertValidation) {
+            if (null !== $certificate && $certificate->isExpired()) {
+                throw new Certificate\Exception\Expired($certificate);
+            }
+        }
+    }
+
+    /**
+     * Apenas para testes, seta a validação de validade do certificado
      * @param bool $flag
      *
      * @return bool
@@ -223,21 +237,5 @@ class RestBase
             return $name;
         }
         $this->randomName($n + 5);
-    }
-
-    /**
-     * Verifica se o certificado é valido na data atual.
-     *
-     * @return void
-     *
-     * @throws Certificate\Exception\Expired
-     */
-    private function isCertificateExpired(?Certificate $certificate = null)
-    {
-        if (!$this->disableCertValidation) {
-            if (null !== $certificate && $certificate->isExpired()) {
-                throw new Certificate\Exception\Expired($certificate);
-            }
-        }
     }
 }

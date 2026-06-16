@@ -1,6 +1,6 @@
 <?php
 
-namespace Hadder\NfseNacional;
+namespace QuantumTecnology\NfseNacional;
 
 use NFePHP\DA\Common\DaCommon;
 use NFePHP\DA\Legacy\Pdf;

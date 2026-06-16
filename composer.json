@@ -9,7 +9,7 @@
   ],
   "autoload": {
     "psr-4": {
-      "Hadder\\NfseNacional\\": "src/"
+      "QuantumTecnology\\NfseNacional\\": "src/"
     },
     "files": [
       "Helpers.php"

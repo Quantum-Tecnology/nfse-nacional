@@ -2,10 +2,10 @@
 
 declare(strict_types = 1);
 
-namespace Hadder\NfseNacional;
+namespace QuantumTecnology\NfseNacional;
 
 use Exception;
-use Hadder\NfseNacional\Common\RestBase;
+use QuantumTecnology\NfseNacional\Common\RestBase;
 use NFePHP\Common\Certificate;
 use NFePHP\Common\Exception\SoapException;
 use NFePHP\Common\Signer;
@@ -32,6 +32,14 @@ class RestCurl extends RestBase
         "cancelar_nfse" => "nfse/{chave}/eventos"
     ];
     private $urls = [];
+
+    /**
+     * URLs nacionais (sem overrides da prefeitura). As CONSULTAS por chave usam
+     * estas — só a EMISSÃO/CANCELAMENTO podem ir ao endpoint próprio da
+     * prefeitura. Municípios como Americana-SP têm emissor próprio que aceita o
+     * leiaute nacional só na emissão; a consulta segue no Ambiente Nacional.
+     */
+    private array $nationalUrls = [];
     private $operations = [];
     private mixed $config;
     private string $url_api;
@@ -46,7 +54,6 @@ class RestCurl extends RestBase
 
     protected $canonical    = [true, false, null, null];
     private string $cookies = '';
-    private string $requestHead;
     private string $temppass = '';
     private string $security_level = '';
 
@@ -70,10 +77,11 @@ class RestCurl extends RestBase
 
         $contextData = $json[$context] ?? [];
 
-        $this->urls = $this->mergeDefaults(self::DEFAULT_URLS, $contextData['urls'] ?? []);
+        // URLs nacionais puras (consultas) x URLs com override da prefeitura (emissão).
+        $this->nationalUrls = self::DEFAULT_URLS;
+        $this->urls         = $this->mergeDefaults(self::DEFAULT_URLS, $contextData['urls'] ?? []);
 
         $this->operations = $this->mergeDefaults(self::DEFAULT_OPERATIONS, $contextData['operations'] ?? []);
-
     }
 
     private function mergeDefaults(array $defaults, array $overrides): array
@@ -88,11 +96,19 @@ class RestCurl extends RestBase
 
     public function getOperation($operation)
     {
+        if (!array_key_exists($operation, $this->operations)) {
+            throw new RuntimeException("Operação desconhecida: {$operation}");
+        }
+
         return $this->operations[$operation];
     }
 
     /**
-     * @param $origem - URL de consulta 1 = Sefin (emissão), 2 = ADN (DANFSe)
+     * Busca dados (CONSULTAS por chave). Usa sempre as URLs do Ambiente Nacional
+     * — nunca o override da prefeitura — pois mesmo municípios com emissor
+     * próprio (ex.: Americana-SP) mantêm as consultas no ambiente nacional.
+     *
+     * @param $origem - 1 = Sefin, 2 = ADN (DANFSe), 3 = NFSE (emissor público)
      *
      * @return mixed|string
      */
@@ -181,13 +197,16 @@ class RestCurl extends RestBase
     }
 
     /**
-     * @param $origem - URL de consulta 1 = Sefin (emissão), 2 = ADN (DANFSe)
+     * Envia dados (EMISSÃO/CANCELAMENTO). Usa as URLs com override da prefeitura
+     * quando o município tem endpoint próprio (ex.: Americana-SP).
+     *
+     * @param $origem - 1 = Sefin (emissão), 2 = ADN, 3 = NFSE
      *
      * @return mixed|string
      */
     public function postData($operacao, $data, $origem = 1)
     {
-        $this->resolveUrl($origem);
+        $this->resolveUrl($origem, usarOverridePrefeitura: true);
         $this->saveTemporarilyKeyFiles();
 
         try {
@@ -286,32 +305,27 @@ class RestCurl extends RestBase
         return $xml;
     }
 
-    private function resolveUrl(int $origem = 0)
+    /**
+     * Resolve a URL base do request.
+     *
+     * @param int  $origem                 1 = SEFIN, 2 = ADN, 3 = NFSE (emissor)
+     * @param bool $usarOverridePrefeitura quando true usa as URLs com override
+     *                                      da prefeitura (EMISSÃO/CANCELAMENTO);
+     *                                      quando false usa as URLs nacionais
+     *                                      (CONSULTAS por chave). Ver
+     *                                      loadConfigOverrides().
+     */
+    private function resolveUrl(int $origem = 0, bool $usarOverridePrefeitura = false): void
     {
-        switch ($origem) {
-            case 1: // SEFIN
-                $this->url_api = $this->urls['sefin_homologacao'];
-                if ($this->config->tpamb === 1) {
-                    $this->url_api = $this->urls['sefin_producao'];
-                }
+        $urls = $usarOverridePrefeitura ? $this->urls : $this->nationalUrls;
+        $prod = 1 === $this->config->tpamb;
 
-                break;
-            case 2: // ADN
-                $this->url_api = $this->urls['adn_homologacao'];
-                if ($this->config->tpamb === 1) {
-                    $this->url_api = $this->urls['adn_producao'];
-                }
-
-                break;
-            case 3: // NFSE
-                $this->url_api = $this->urls['nfse_homologacao'];
-                if ($this->config->tpamb === 1) {
-                    $this->url_api = $this->urls['nfse_producao'];
-                }
-
-                break;
-        }
-
+        $this->url_api = match ($origem) {
+            1 => $prod ? $urls['sefin_producao'] : $urls['sefin_homologacao'], // SEFIN
+            2 => $prod ? $urls['adn_producao'] : $urls['adn_homologacao'],     // ADN
+            3 => $prod ? $urls['nfse_producao'] : $urls['nfse_homologacao'],   // NFSE
+            default => throw new RuntimeException("Origem de URL inválida: {$origem}"),
+        };
     }
 
     private function captureCookies(string $headers, int $origem): void

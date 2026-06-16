@@ -2,7 +2,7 @@
 
 declare(strict_types = 1);
 
-namespace Hadder\NfseNacional\Common;
+namespace QuantumTecnology\NfseNacional\Common;
 
 use DateInterval;
 use DateTime;
@@ -236,6 +236,7 @@ class RestBase
         if (!$this->filesystem->has($name)) {
             return $name;
         }
-        $this->randomName($n + 5);
+
+        return $this->randomName($n + 5);
     }
 }

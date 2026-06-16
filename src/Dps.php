@@ -2,7 +2,7 @@
 
 declare(strict_types = 1);
 
-namespace Hadder\NfseNacional;
+namespace QuantumTecnology\NfseNacional;
 
 /*
  * Class for RPS construction and validation of data
@@ -11,6 +11,7 @@ namespace Hadder\NfseNacional;
 
 use DOMException;
 use DOMNode;
+use InvalidArgumentException;
 use NFePHP\Common\DOMImproved as Dom;
 use stdClass;
 
@@ -551,10 +552,24 @@ class Dps implements DpsInterface
         $cserv_inner = $this->dom->createElement('cServ');
         $serv_inner->appendChild($cserv_inner);
 
+        // cTribNac (TSCodTribNac) é obrigatório e deve ter exatamente 6 dígitos.
+        // Sem essa guarda o DOMImproved geraria uma tag <cTribNac/> vazia e a
+        // SEFAZ rejeitaria com L2103 (XML fora do schema) — erro difícil de
+        // diagnosticar. Falhamos cedo com mensagem clara.
+        $ctribnac = $this->std->infdps->serv->cserv->ctribnac ?? null;
+
+        if (!preg_match('/^\d{6}$/', (string) $ctribnac)) {
+            throw new InvalidArgumentException(
+                'cTribNac inválido: é obrigatório e deve ter exatamente 6 dígitos '
+                . '(código de tributação nacional do ISSQN). Valor recebido: '
+                . var_export($ctribnac, true)
+            );
+        }
+
         $this->dom->addChild(
             $cserv_inner,
             'cTribNac',
-            $this->std->infdps->serv->cserv->ctribnac,
+            $ctribnac,
             true
         );
 

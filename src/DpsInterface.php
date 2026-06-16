@@ -2,7 +2,7 @@
 
 declare(strict_types = 1);
 
-namespace Hadder\NfseNacional;
+namespace QuantumTecnology\NfseNacional;
 
 interface DpsInterface
 {

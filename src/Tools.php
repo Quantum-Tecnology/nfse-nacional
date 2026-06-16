@@ -2,9 +2,8 @@
 
 declare(strict_types = 1);
 
-namespace Hadder\NfseNacional;
+namespace QuantumTecnology\NfseNacional;
 
-use DOMDocument;
 use NFePHP\Common\Certificate;
 
 class Tools extends RestCurl
@@ -107,7 +106,6 @@ class Tools extends RestCurl
 
     public function enviaDps($content): array
     {
-        // $content = $this->canonize($content);
         $content = $this->sign($content, 'infDPS', '', 'DPS');
         $content = '<?xml version="1.0" encoding="UTF-8"?>' . $content;
         $gz      = gzencode($content);
@@ -124,7 +122,6 @@ class Tools extends RestCurl
     {
         $dps     = new Dps($std);
         $content = $dps->renderEvento($std);
-        // $content = $this->canonize($content);
         $content = $this->sign($content, 'infPedReg', '', 'pedRegEvento');
         $content = '<?xml version="1.0" encoding="UTF-8"?>' . $content;
         $gz      = gzencode($content);
@@ -137,14 +134,4 @@ class Tools extends RestCurl
         return $retorno;
     }
 
-    protected function canonize($content)
-    {
-        $dom                     = new DOMDocument('1.0', 'utf-8');
-        $dom->formatOutput       = false;
-        $dom->preserveWhiteSpace = false;
-        $dom->loadXML($content);
-        dump($dom->saveXML());
-
-        return $dom->C14N(false, false, null, null);
-    }
 }

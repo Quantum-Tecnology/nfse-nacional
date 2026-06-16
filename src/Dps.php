@@ -169,12 +169,14 @@ class Dps implements DpsInterface
                 $this->std->infdps->subst->cmotivo,
                 true
             );
-            $this->dom->addChild(
-                $subst_inner,
-                'xMotivo',
-                $this->std->infdps->subst->xmotivo,
-                true
-            );
+            if (isset($this->std->infdps->subst->xmotivo)) {
+                $this->dom->addChild(
+                    $subst_inner,
+                    'xMotivo',
+                    $this->std->infdps->subst->xmotivo,
+                    true
+                );
+            }
         }
 
         if (isset($this->std->infdps->prest)) {

@@ -10,14 +10,16 @@ Este é um **fork mantido pela [Quantum Tecnology](https://github.com/Quantum-Te
 
 Além de tudo que já existia no pacote original, esta versão adiciona:
 
-### 🧭 Roteamento inteligente por município (emissão × consulta)
-Municípios com **emissor próprio** (ex.: **Americana-SP**) aceitam o leiaute nacional, mas **só na emissão**, num endpoint específico da prefeitura — enquanto as **consultas** continuam no Ambiente Nacional (ADN/SEFIN).
+### 🧭 Roteamento inteligente por município (emissão × cancelamento × consulta)
+Municípios com **emissor próprio** (ex.: **Americana-SP**) aceitam o leiaute nacional, mas num endpoint específico da prefeitura — enquanto as **consultas** continuam no Ambiente Nacional (ADN/SEFIN).
 
-O pacote agora separa essas responsabilidades automaticamente:
-- **Emissão / cancelamento** → usa a URL configurada em `storage/prefeituras.json` (override da prefeitura).
+O pacote separa essas responsabilidades automaticamente:
+- **Emissão / cancelamento** → usam a URL configurada em `storage/prefeituras.json` (override da prefeitura).
 - **Consultas por chave** → usam sempre o Ambiente Nacional central.
 
 Isso elimina os erros `404` que ocorriam quando a consulta era enviada, por engano, ao endpoint de emissão da prefeitura.
+
+> ⚠️ **Emissão e cancelamento costumam ter endpoints DIFERENTES.** Em Americana-SP, por exemplo, a emissão vai para `.../api/adn/dps/recepcao` e o cancelamento (evento) para `.../api/adn/dps/evento`. Por isso o `storage/prefeituras.json` separa `urls` (base) de `operations` (caminho por operação): a URL final é `base + "/" + operação`. Se `cancelar_nfse` ficar vazio, o evento de cancelamento é postado na base de emissão e a prefeitura rejeita com **"DPS inválido ou não informado"**. Veja [Configuração da prefeitura](#configuração-da-prefeitura).
 
 ### 🧾 DANFSe local (sem depender do ADN)
 Geração do PDF da DANFSe **diretamente a partir do XML**, sem precisar baixar o PDF oficial do Ambiente Nacional:

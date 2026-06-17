@@ -42,15 +42,19 @@ class Tools extends RestCurl
     public function consultarNfseEventos($chave, $tipoEvento = null, $nSequencial = null)
     {
         $operacao = str_replace("{chave}", $chave, $this->getOperation('consultar_eventos'));
-        if (!$tipoEvento) {
+
+        if ($tipoEvento) {
+            $operacao = str_replace("{tipoEvento}", (string) $tipoEvento, $operacao);
+        } else {
+            // Sem tipo de evento: remove os dois segmentos opcionais da URL.
             $operacao = str_replace("/{tipoEvento}/{nSequencial}", "", $operacao);
         }
-        $operacao = str_replace("{tipoEvento}", $tipoEvento, $operacao);
 
-        if (!$nSequencial) {
+        if ($nSequencial) {
+            $operacao = str_replace("{nSequencial}", (string) $nSequencial, $operacao);
+        } else {
             $operacao = str_replace("/{nSequencial}", "", $operacao);
         }
-        $operacao = str_replace("{nSequencial}", $nSequencial, $operacao);
 
         $retorno = $this->getData($operacao);
 

@@ -79,6 +79,27 @@ A variável `prefeitura` aceita atualmente dois formatos:
 
 ⚠️ Ambos são aceitos por compatibilidade, mas **o padrão futuro será exclusivamente o código IBGE**. Recomenda-se já adotá-lo. As URLs e operações por município ficam em [`storage/prefeituras.json`](storage/prefeituras.json).
 
+#### Estrutura do `prefeituras.json`
+
+Cada município tem `urls` (a **base** por ambiente) e `operations` (o **caminho** de cada operação). A URL final é montada como `base + "/" + operação` (a operação vazia `""` usa a base direta):
+
+```jsonc
+{
+    "3501608": {                         // código IBGE (chave recomendada)
+        "urls": {
+            "sefin_producao":    "https://nfse.americana.sp.gov.br/api/adn/dps",
+            "sefin_homologacao": "https://americanahomologacao.nfe.com.br/api/adn/dps"
+        },
+        "operations": {
+            "emitir_nfse":   "recepcao",  // => .../api/adn/dps/recepcao
+            "cancelar_nfse": "evento"     // => .../api/adn/dps/evento
+        }
+    }
+}
+```
+
+> ⚠️ **Não deixe `cancelar_nfse` vazio quando o cancelamento usa um caminho diferente da emissão.** Se a base apontar para `.../recepcao` e `cancelar_nfse` for `""`, o evento de cancelamento será postado em `.../recepcao` e a prefeitura responderá **"DPS inválido ou não informado"**. Prefira manter a base no nível comum (`.../api/adn/dps`) e especificar cada operação. Consulte o manual da prefeitura para os endpoints corretos (emissão, evento/cancelamento, consulta por chave, download de XML/DANFSe).
+
 ### `consultarNfseChave()` e encoding
 
 O XML, após o `gzdecode`, vem em **ISO-8859-1**. Por padrão o método mantém ISO via `mb_convert_encoding`. Caso tenha problemas, passe `false` no segundo parâmetro para receber o XML cru:

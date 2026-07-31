@@ -11,13 +11,15 @@ Este é um **fork mantido pela [Quantum Tecnology](https://github.com/Quantum-Te
 Além de tudo que já existia no pacote original, esta versão adiciona:
 
 ### 🏛️ Destaque de IBS/CBS (Reforma Tributária — EC 132/2023)
-O grupo `<IBSCBS>` do DPS é gerado a partir de `$std->infDPS->IBSCBS`. É **opcional**: sem ele no payload, o XML sai exatamente como antes.
+O grupo `<IBSCBS>` do DPS é gerado a partir de `$std->infDPS->IBSCBS`.
+
+> 🚨 **A partir de 01/08/2026 este grupo é obrigatório** — sem ele a NFS-e é rejeitada na recepção. No pacote ele continua sendo emitido apenas quando presente no payload (sem o campo, o XML sai como antes), então **a responsabilidade de preenchê-lo é de quem integra**. Veja o [calendário](#-calendário-da-reforma--o-que-entra-e-o-que-sai-e-quando).
 
 No DPS você **apenas declara a situação tributária** — `CST` e `cClassTrib`. As alíquotas e os valores de IBS/CBS são calculados pelo Ambiente de Dados Nacional e voltam no `<infNFSe>` da NFS-e autorizada; **não envie valores**.
 
 ```php
 $std->infDPS->IBSCBS = (object) [
-    'finNFSe'  => '0',        // hoje o XSD só aceita 0
+    'finNFSe'  => '0',        // 0 = regular (único valor aceito no schema v1.01)
     'indFinal' => '0',        // 0 = não é consumidor final
     'cIndOp'   => '030101',   // 6 dígitos (tabela oficial)
     'indDest'  => '0',        // 0 = tomador é o destinatário
@@ -35,6 +37,34 @@ $std->infDPS->IBSCBS = (object) [
 Grupos opcionais suportados: `tpOper`, `gRefNFSe` (até 99 chaves), `tpEnteGov`, `dest` (com endereço nacional ou exterior), `imovel` (`cCIB` ou endereço), `gReeRepRes` (até 1000 documentos), `cCredPres`, `gTribRegular` e `gDif`.
 
 > ⚠️ **Os códigos são strings, nunca inteiros.** `CST`, `cClassTrib`, `cIndOp` e `cCredPres` têm zero à esquerda significativo — um cast para `int` transforma `'000001'` em `1` e a nota é rejeitada.
+
+#### 📅 Calendário da Reforma — o que entra e o que sai, e quando
+
+| Data | O que muda | Impacto em quem emite |
+|---|---|---|
+| **01/08/2026** | O grupo `<IBSCBS>` **passa a ser obrigatório** para autorização/recepção da NFS-e | 🚨 **Emissão sem o grupo é rejeitada.** Quem hoje não preenche `$std->infDPS->IBSCBS` para de emitir |
+| **01/08/2026** | `tpRetPisCofins` **deixa de aceitar os valores `1` e `2`** | Use os códigos novos (`3` a `9`) ou `0` |
+| **01/01/2027** | `IBSCBS` passa a ser obrigatório **também para optantes do Simples Nacional** (até lá, dispensados) | Emissores do Simples precisam preencher o grupo |
+| **01/01/2027** | IBS/CBS passam a ser cobrados **"por fora"**: `vTotNF = vLiq + vCBS + vIBSTot` (em 2026 é só `vLiq`) | Muda o valor total da nota — atenção a conciliação e integrações |
+| **01/01/2027** | PIS/COFINS saem da base do IBS/CBS: `vBC` deixa de subtrair `vPIS`/`vCOFINS` | Base de cálculo aumenta |
+| **até 2032** | Período de transição da EC 132/2023 | Convivência dos dois regimes |
+
+> As datas acima constam do **Anexo VI da NT SE/CGNFS-e nº 009** (leiaute RTC IBS/CBS v1.04) e da **NT SE/CGNFS-e nº 007**, de 07/02/2026. Confirme sempre no [portal da NFS-e](https://www.nfse.gov.br/) — o cronograma da Reforma vem sendo ajustado.
+
+#### 🔭 Já previsto na NT 009, ainda não implementado
+
+Estes campos existem no leiaute v1.04 mas **não** nos XSDs v1.01 que o pacote empacota. Serão adicionados quando os schemas v1.04 forem publicados:
+
+| Campo / grupo | Para quê |
+|---|---|
+| `indZFMALC` | Zona Franca de Manaus / ALC — alíquota zero de CBS |
+| `indDoacao` + `gEstornoCred` | operação de doação e estorno dos créditos de entrada |
+| `gIBSCBSAjuste` | notas de ajuste (`vIBS`, `vCBS`) |
+| `gPagAntecipado` | referência a NFS-e de pagamento antecipado |
+| `gPgtoVinc` | vinculação com a transação de pagamento (PIX, cartão) |
+| `bensMoveis` | locação de bens móveis (`cTribNac` 99.04.01) |
+
+Dois pontos **mudam estrutura** e por isso aguardam os novos schemas: `finNFSe` migra de `IBSCBS/finNFSe` para `infDPS/finNFSe` (passando a aceitar `0` regular, `1` crédito e `2` débito), e o grupo `imovel` é redesenhado em `cMun` + `gLocacao` + `gUnidImob`.
 
 ### 🧭 Roteamento inteligente por município (emissão × cancelamento × consulta)
 Municípios com **emissor próprio** (ex.: **Americana-SP**) aceitam o leiaute nacional, mas num endpoint específico da prefeitura — enquanto as **consultas** continuam no Ambiente Nacional (ADN/SEFIN).

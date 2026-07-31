@@ -19,6 +19,19 @@ use stdClass;
 class Dps implements DpsInterface
 {
     /**
+     * Data em que o grupo IBSCBS passa a ser obrigatório na recepção da NFS-e.
+     *
+     * NT SE/CGNFS-e nº 007 (07/02/2026) e Anexo VI da NT 009. A partir desta
+     * competência a SEFAZ rejeita DPS sem o grupo.
+     */
+    public const IBSCBS_OBRIGATORIO_EM = '2026-08-01';
+
+    /**
+     * Competência a partir da qual o IBSCBS também vale para o Simples Nacional.
+     */
+    public const IBSCBS_OBRIGATORIO_SIMPLES_EM = '2027-01-01';
+
+    /**
      * @var stdClass
      */
     public $std;
@@ -1184,6 +1197,8 @@ class Dps implements DpsInterface
         //
         // Atenção: os códigos (CST, cClassTrib, cIndOp, cCredPres) são STRINGS com zero
         // à esquerda significativo ("000", "000001"). Um cast para int os destrói.
+        $this->avisaIbsCbsObrigatorio();
+
         if (isset($this->std->infdps->ibscbs)) {
             $ibscbs = $this->std->infdps->ibscbs;
 
@@ -1748,6 +1763,46 @@ class Dps implements DpsInterface
     public function getEventoId()
     {
         return $this->preId;
+    }
+
+    /**
+     * Alerta quando a competência já exige o grupo IBSCBS e ele não veio.
+     *
+     * Não lança exceção de propósito: o pacote não sabe se o emitente é optante
+     * do Simples (dispensado até 2027) nem se a prefeitura postergou a exigência,
+     * e derrubar uma emissão que a SEFAZ ainda aceitaria seria pior que o
+     * problema. Emite E_USER_WARNING — visível no log de quem integra, silenciável
+     * por error_reporting, e o XML segue sendo gerado.
+     *
+     * Consulte $dom->errors / o retorno da SEFAZ para o veredito final.
+     */
+    private function avisaIbsCbsObrigatorio(): void
+    {
+        if (isset($this->std->infdps->ibscbs)) {
+            return;
+        }
+
+        $competencia = $this->std->infdps->dcompet ?? null;
+
+        if (!is_string($competencia) || !preg_match('/^\d{4}-\d{2}-\d{2}/', $competencia)) {
+            return;
+        }
+
+        if (mb_substr($competencia, 0, 10) < self::IBSCBS_OBRIGATORIO_EM) {
+            return;
+        }
+
+        trigger_error(
+            sprintf(
+                'DPS sem o grupo IBSCBS com dCompet %s: desde %s o grupo é obrigatório na recepção da NFS-e '
+                . '(NT SE/CGNFS-e nº 007) e a SEFAZ tende a rejeitar. Optantes do Simples Nacional só são '
+                . 'exigidos a partir de %s. Preencha $std->infDPS->IBSCBS.',
+                mb_substr($competencia, 0, 10),
+                self::IBSCBS_OBRIGATORIO_EM,
+                self::IBSCBS_OBRIGATORIO_SIMPLES_EM
+            ),
+            E_USER_WARNING
+        );
     }
 
     /**

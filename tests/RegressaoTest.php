@@ -135,6 +135,75 @@ final class RegressaoTest extends TestCase
 
     /*
     |--------------------------------------------------------------------------
+    | Vigência: IBSCBS obrigatório desde 01/08/2026
+    |--------------------------------------------------------------------------
+    |
+    | A partir dessa competência a SEFAZ rejeita DPS sem o grupo. O pacote avisa
+    | (E_USER_WARNING) em vez de lançar: não sabe se o emitente é optante do
+    | Simples, dispensado até 2027.
+    */
+
+    #[Test]
+    public function avisaQuandoIbscbsFaltaEmCompetenciaObrigatoria(): void
+    {
+        $std = $this->stdBase();
+
+        $std->infDPS->dCompet = '2026-08-01';
+
+        $avisos = $this->capturaAvisos(fn () => (new Dps($std))->render());
+
+        $this->assertCount(1, $avisos, 'Deveria avisar sobre o IBSCBS ausente.');
+        $this->assertStringContainsString('IBSCBS', $avisos[0]);
+        $this->assertStringContainsString('2026-08-01', $avisos[0]);
+    }
+
+    #[Test]
+    public function naoAvisaAntesDaDataDeObrigatoriedade(): void
+    {
+        $std = $this->stdBase();
+
+        $std->infDPS->dCompet = '2026-07-31';
+
+        $this->assertSame([], $this->capturaAvisos(fn () => (new Dps($std))->render()));
+    }
+
+    #[Test]
+    public function naoAvisaQuandoOGrupoFoiInformado(): void
+    {
+        $std = $this->stdBase();
+
+        $std->infDPS->dCompet = '2027-03-01';
+        $std->infDPS->IBSCBS  = (object) [
+            'finNFSe'  => '0',
+            'indFinal' => '0',
+            'cIndOp'   => '030101',
+            'indDest'  => '0',
+            'valores'  => (object) [
+                'trib' => (object) [
+                    'gIBSCBS' => (object) ['CST' => '000', 'cClassTrib' => '000001'],
+                ],
+            ],
+        ];
+
+        $this->assertSame([], $this->capturaAvisos(fn () => (new Dps($std))->render()));
+    }
+
+    #[Test]
+    public function oAvisoNaoImpedeAGeracaoDoXml(): void
+    {
+        $std = $this->stdBase();
+
+        $std->infDPS->dCompet = '2026-12-01';
+
+        $xml = @(new Dps($std))->render();
+
+        // O aviso não pode virar exceção: a nota ainda precisa ser gerada.
+        $this->assertStringContainsString('<infDPS', $xml);
+        $this->assertStringNotContainsString('<IBSCBS', $xml);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Dead code removido do renderEvento()
     |--------------------------------------------------------------------------
     */
@@ -189,6 +258,34 @@ final class RegressaoTest extends TestCase
     | Helpers
     |--------------------------------------------------------------------------
     */
+
+    /**
+     * Executa o callback capturando os E_USER_WARNING emitidos.
+     *
+     * @return string[]
+     */
+    private function capturaAvisos(callable $fn): array
+    {
+        $avisos = [];
+
+        set_error_handler(static function (int $nivel, string $msg) use (&$avisos): bool {
+            if (E_USER_WARNING === $nivel) {
+                $avisos[] = $msg;
+
+                return true;
+            }
+
+            return false;
+        });
+
+        try {
+            $fn();
+        } finally {
+            restore_error_handler();
+        }
+
+        return $avisos;
+    }
 
     private function render(stdClass $std): DOMXPath
     {

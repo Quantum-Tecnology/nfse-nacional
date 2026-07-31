@@ -84,6 +84,36 @@ Geração do PDF da DANFSe **diretamente a partir do XML**, sem precisar baixar 
 
 Útil quando o ADN está indisponível, para pré-visualização antes da transmissão, ou para notas importadas que não têm PDF oficial salvo.
 
+### ✅ Validação contra os XSDs oficiais
+Os schemas em `storage/schemes/` eram arquivos órfãos: o pacote assinava e transmitia XML fora do schema, e o erro só aparecia como rejeição genérica da SEFAZ (`L2103`). Agora **toda transmissão é validada antes de assinar**, seguindo o mesmo padrão do [sped-nfe](https://github.com/nfephp-org/sped-nfe).
+
+`enviaDps()` e `cancelaNfse()` lançam `SchemaValidationException` — com o elemento exato apontado — em vez de mandar um documento inválido para a SEFAZ:
+
+```php
+use QuantumTecnology\NfseNacional\SchemaValidationException;
+
+try {
+    $retorno = $tools->enviaDps($dps->render());
+} catch (SchemaValidationException $e) {
+    // ["Element 'cServ': Missing child element(s). Expected is ( cNBS ). (linha 1)"]
+    $erros = $e->getErrors();
+}
+```
+
+Para validar por conta própria, antes de transmitir:
+
+```php
+$xml = $dps->render();
+
+if ($erros = $dps->validate($xml)) {   // [] quando válido
+    // trata sem gastar uma ida à SEFAZ
+}
+
+$dps->getErrors();  // campos obrigatórios que ficaram vazios na montagem
+```
+
+O XSD é escolhido pela versão declarada no próprio XML (`<DPS versao="...">`), então a convivência de v1.01 e futuras v1.04 funciona sem configuração. Se o schema de uma versão não estiver no pacote, a emissão **não é bloqueada** — mesma decisão do sped-nfe. Para desligar: `$tools->setValidateSchema(false)`.
+
 ### 🛡️ Validação que falha cedo e com mensagem clara
 - **`cTribNac` obrigatório (6 dígitos)** é validado na montagem do DPS. Antes, um valor ausente gerava uma tag `<cTribNac/>` vazia e a SEFAZ rejeitava com **`L2103`** (XML fora do schema) — erro difícil de diagnosticar. Agora você recebe uma `InvalidArgumentException` clara, **antes** de assinar e transmitir.
 - **`getOperation()`** e a resolução de URL lançam exceção em chaves/origens desconhecidas, em vez de falhar silenciosamente.

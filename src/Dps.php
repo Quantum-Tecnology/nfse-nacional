@@ -1607,19 +1607,19 @@ class Dps implements DpsInterface
         $this->dom->addChild(
             $infpedreg_inner,
             'tpAmb',
-            $this->std->infpedreg->tpamb,
+            $this->std->infpedreg->tpamb ?? null,
             true
         );
         $this->dom->addChild(
             $infpedreg_inner,
             'verAplic',
-            $this->std->infpedreg->veraplic,
+            $this->std->infpedreg->veraplic ?? null,
             true
         );
         $this->dom->addChild(
             $infpedreg_inner,
             'dhEvento',
-            $this->std->infpedreg->dhevento,
+            $this->std->infpedreg->dhevento ?? null,
             true
         );
 
@@ -1643,7 +1643,7 @@ class Dps implements DpsInterface
         $this->dom->addChild(
             $infpedreg_inner,
             'chNFSe',
-            $this->std->infpedreg->chnfse,
+            $this->std->infpedreg->chnfse ?? null,
             true
         );
 
@@ -1669,16 +1669,18 @@ class Dps implements DpsInterface
                 'Cancelamento de NFS-e',
                 true
             );
+            // ?? null: campo obrigatório ausente vira erro em $dom->errors (e o
+            // XSD acusa), em vez de "Undefined property" no meio da montagem.
             $this->dom->addChild(
                 $e101101_inner,
                 'cMotivo',
-                $this->std->infpedreg->e101101->cmotivo,
+                $this->std->infpedreg->e101101->cmotivo ?? null,
                 true
             );
             $this->dom->addChild(
                 $e101101_inner,
                 'xMotivo',
-                $this->std->infpedreg->e101101->xmotivo,
+                $this->std->infpedreg->e101101->xmotivo ?? null,
                 true
             );
         } elseif (isset($this->std->infpedreg->e105102)) {
@@ -1695,7 +1697,7 @@ class Dps implements DpsInterface
             $this->dom->addChild(
                 $e105102_inner,
                 'cMotivo',
-                $this->std->infpedreg->e105102->cmotivo,
+                $this->std->infpedreg->e105102->cmotivo ?? null,
                 true
             );
 
@@ -1710,7 +1712,7 @@ class Dps implements DpsInterface
             $this->dom->addChild(
                 $e105102_inner,
                 'chSubstituta',
-                $this->std->infpedreg->e105102->chsubstituta,
+                $this->std->infpedreg->e105102->chsubstituta ?? null,
                 true
             );
         }
@@ -1754,6 +1756,40 @@ class Dps implements DpsInterface
     //        }
     //        return true;
     //    }
+
+    /**
+     * Valida um XML gerado por render()/renderEvento() contra o XSD oficial.
+     *
+     * Não é chamado automaticamente pelo render() para não pagar o parse do XSD
+     * em toda emissão — quem integra decide quando validar. Valide ANTES de
+     * assinar: a <Signature> é acrescentada depois, em Tools::enviaDps().
+     *
+     * @param string $documento 'DPS' (padrão) ou 'pedRegEvento'
+     *
+     * @return string[] mensagens de erro; array vazio quando válido
+     */
+    public function validate(string $xml, string $documento = 'DPS'): array
+    {
+        return SchemaValidator::errors(
+            $xml,
+            $documento,
+            $this->std->version ?? '1.01'
+        );
+    }
+
+    /**
+     * Erros de preenchimento acumulados durante a montagem do XML.
+     *
+     * O DOMImproved registra aqui todo campo obrigatório que veio vazio — e cria
+     * a tag mesmo assim. Sem consultar isto, a falha é silenciosa até a SEFAZ
+     * rejeitar.
+     *
+     * @return string[]
+     */
+    public function getErrors(): array
+    {
+        return $this->dom->errors ?? [];
+    }
 
     public function getDpsId()
     {
@@ -1985,7 +2021,7 @@ class Dps implements DpsInterface
         // totalizando 62 chars. O nPedRegEvento vai zero-padded aqui, mas o elemento
         // <nPedRegEvento> é TSNum3Dig e NÃO aceita zero à esquerda.
         $string = 'PRE';
-        $string .= $this->std->infpedreg->chnfse; // Chave de acesso da NFS-e (50) +
+        $string .= $this->std->infpedreg->chnfse ?? ''; // Chave de acesso da NFS-e (50) +
         $string .= $this->codigoEvento(); // Código do evento (6) +
         $string .= str_pad($this->numeroPedidoEvento(), 3, '0', STR_PAD_LEFT); // nPedRegEvento (3)
         $this->preId = $string;

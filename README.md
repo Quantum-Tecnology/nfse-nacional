@@ -187,12 +187,25 @@ A suíte valida o XML gerado contra os **XSDs oficiais v1.01** (`storage/schemes
 | `consultarDpsChave` | Consulta o DPS pela chave | [ConsultaDpsChave.php](examples/ConsultaDpsChave.php) |
 | `consultarNfseEventos` | Consulta eventos de uma NFS-e | [ConsultaNfseEventos.php](examples/ConsultaNfseEventos.php) |
 | `consultarDanfse` | Baixa a DANFSe (PDF oficial) do ADN | [ConsultaDanfse.php](examples/ConsultaDanfse.php) |
-| `Danfse` / `DanfseSimples` | Gera a DANFSe **localmente** a partir do XML | [GeraDanfseLocal.php](examples/GeraDanfseLocal.php) |
+| `Danfse` / `DanfseSimples` | DANFSe oficial **com fallback local** quando o ADN falha | [GeraDanfseLocal.php](examples/GeraDanfseLocal.php) |
 | `Dps::validate()` / `getErrors()` | Valida o XML antes de transmitir | [MakeDpsIbsCbs.php](examples/MakeDpsIbsCbs.php) |
 
 Todos os exemplos estão em [`examples/`](examples/) e rodam em PHP puro — basta ajustar o certificado e os dados do emitente.
 
 ## ⚠️ Avisos importantes
+
+### DANFSe: o endpoint do ADN é intermitente
+
+`consultarDanfse()` pode voltar **vazio para uma chave válida** — indisponibilidade temporária do Ambiente Nacional, não "nota inexistente". Em produção, trate assim:
+
+1. **Repita algumas vezes** antes de desistir (com espera progressiva);
+2. **Confira a assinatura do PDF** (`str_starts_with($retorno, '%PDF')`) — o endpoint também devolve JSON de erro;
+3. **Não repita em caso de exceção** (certificado, config, rede): é falha dura;
+4. **Caia para a geração local** a partir do XML.
+
+> 🔑 A chave precisa ser **numérica, 50 dígitos**. A SEFAZ devolve `chaveAcesso` com o prefixo `NFS` (decoração do `Id` do XML) e, com ele, a consulta volta **vazia sem erro** — um dos enganos mais comuns. Limpe com `preg_replace('/\D/', '', $chave)`.
+
+A implementação completa está em [GeraDanfseLocal.php](examples/GeraDanfseLocal.php).
 
 ### Configuração da prefeitura
 

@@ -15,6 +15,11 @@
       "Helpers.php"
     ]
   },
+  "autoload-dev": {
+    "psr-4": {
+      "QuantumTecnology\\NfseNacional\\Tests\\": "tests/"
+    }
+  },
   "authors": [
     {
       "name": "Fernando Friedrich",
@@ -45,7 +50,11 @@
   },
   "require-dev": {
     "friendsofphp/php-cs-fixer": "^3.89",
-    "laravel/pint": "^1.0"
+    "laravel/pint": "^1.0",
+    "phpunit/phpunit": "^12.0"
+  },
+  "scripts": {
+    "test": "phpunit"
   },
   "config": {
     "optimize-autoloader": true

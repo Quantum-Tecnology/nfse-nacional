@@ -3,3 +3,5 @@ composer.lock
 vendor/
 exemples/certs/
 exemples/local/
+.php-cs-fixer.cache
+.phpunit.cache/

@@ -263,8 +263,10 @@ class RestCurl extends RestBase
             $headsize = curl_getinfo($oCurl, CURLINFO_HEADER_SIZE);
             $httpcode = curl_getinfo($oCurl, CURLINFO_HTTP_CODE);
             curl_close($oCurl);
-            $this->responseHead = mb_trim(mb_substr($response, 0, $headsize));
-            $this->responseBody = mb_trim(mb_substr($response, $headsize));
+            // trim e não mb_trim: cabeçalhos HTTP são ASCII, e mb_trim só existe
+            // no PHP 8.4 (o pacote declara ^8.1 no composer).
+            $this->responseHead = trim(mb_substr($response, 0, $headsize));
+            $this->responseBody = trim(mb_substr($response, $headsize));
 
             return json_decode($this->responseBody, true);
         } catch (Exception $e) {

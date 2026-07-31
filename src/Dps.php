@@ -181,6 +181,7 @@ class Dps implements DpsInterface
                 $this->std->infdps->subst->cmotivo,
                 true
             );
+
             if (isset($this->std->infdps->subst->xmotivo)) {
                 $this->dom->addChild(
                     $subst_inner,
@@ -570,11 +571,7 @@ class Dps implements DpsInterface
         $ctribnac = $this->std->infdps->serv->cserv->ctribnac ?? null;
 
         if (!preg_match('/^\d{6}$/', (string) $ctribnac)) {
-            throw new InvalidArgumentException(
-                'cTribNac inválido: é obrigatório e deve ter exatamente 6 dígitos '
-                . '(código de tributação nacional do ISSQN). Valor recebido: '
-                . var_export($ctribnac, true)
-            );
+            throw new InvalidArgumentException('cTribNac inválido: é obrigatório e deve ter exatamente 6 dígitos (código de tributação nacional do ISSQN). Valor recebido: ' . var_export($ctribnac, true));
         }
 
         $this->dom->addChild(
@@ -599,14 +596,14 @@ class Dps implements DpsInterface
             true
         );
 
-        if (isset($this->std->infdps->serv->cserv->cnbs)) {
-            $this->dom->addChild(
-                $cserv_inner,
-                'cNBS',
-                $this->std->infdps->serv->cserv->cnbs,
-                true
-            );
-        }
+        // cNBS é OBRIGATÓRIO no XSD (TCCodServico, minOccurs default = 1). Emitir
+        // sem ele gera rejeição L2103 na SEFAZ, então não vai sob isset.
+        $this->dom->addChild(
+            $cserv_inner,
+            'cNBS',
+            $this->std->infdps->serv->cserv->cnbs ?? null,
+            true
+        );
 
         if (isset($this->std->infdps->serv->cserv->cintcontrib)) {
             $this->dom->addChild(
@@ -775,7 +772,7 @@ class Dps implements DpsInterface
             }
         }
 
-        //TODO Fazer grupo lsadppu
+        // TODO Fazer grupo lsadppu
         if (isset($this->std->infdps->serv->atvevento)) {
             $atvEvento_inner = $this->dom->createElement('atvEvento');
             $serv_inner->appendChild($atvEvento_inner);
@@ -852,8 +849,7 @@ class Dps implements DpsInterface
                 }
             }
         }
-        //TODO Fazer grupo explRod
-
+        // TODO Fazer grupo explRod
 
         // Grupo de informações complementares disponível para todos os serviços prestados
         if (isset($this->std->infdps->serv->infocompl->iddoctec)) {
@@ -868,6 +864,7 @@ class Dps implements DpsInterface
                 true
             );
         }
+
         if (isset($this->std->infdps->serv->infocompl->docref)) {
             if (!isset($infocompl_inner)) {
                 $infocompl_inner = $this->dom->createElement('infoCompl');
@@ -880,6 +877,7 @@ class Dps implements DpsInterface
                 true
             );
         }
+
         if (isset($this->std->infdps->serv->infocompl->xped)) {
             if (!isset($infocompl_inner)) {
                 $infocompl_inner = $this->dom->createElement('infoCompl');
@@ -892,6 +890,7 @@ class Dps implements DpsInterface
                 true
             );
         }
+
         if (isset($this->std->infdps->serv->infocompl->gitemped->xitemped)) {
             if (!isset($infocompl_inner)) {
                 $infocompl_inner = $this->dom->createElement('infoCompl');
@@ -906,6 +905,7 @@ class Dps implements DpsInterface
                 true
             );
         }
+
         if (isset($this->std->infdps->serv->infocompl->xinfcomp)) {
             if (!isset($infocompl_inner)) {
                 $infocompl_inner = $this->dom->createElement('infoCompl');
@@ -938,25 +938,24 @@ class Dps implements DpsInterface
             true
         );
 
-        //TODO Fazer grupo vDescCondIncond
-		// Grupo vDescCondIncond (dentro de <valores>)
-		$vDescIncond = $this->std->infdps->valores->vdesccondincond->vdescincond ?? null;
-		$vDescCond   = $this->std->infdps->valores->vdesccondincond->vdesccond   ?? null;
+        // TODO Fazer grupo vDescCondIncond
+        // Grupo vDescCondIncond (dentro de <valores>)
+        $vDescIncond = $this->std->infdps->valores->vdesccondincond->vdescincond ?? null;
+        $vDescCond   = $this->std->infdps->valores->vdesccondincond->vdesccond ?? null;
 
-		// regra: considera vazio se null, string vazia, ou "0.00" (ajuste se quiser manter 0.00)
-		$temDescIncond = ($vDescIncond !== null && $vDescIncond !== '' && $vDescIncond !== '0.00');
-		$temDescCond   = ($vDescCond   !== null && $vDescCond   !== '' && $vDescCond   !== '0.00');
+        // regra: considera vazio se null, string vazia, ou "0.00" (ajuste se quiser manter 0.00)
+        $temDescIncond = (null !== $vDescIncond && '' !== $vDescIncond && '0.00' !== $vDescIncond);
+        $temDescCond   = (null !== $vDescCond && '' !== $vDescCond && '0.00' !== $vDescCond);
 
-		if ($temDescIncond || $temDescCond) {
-			$descontos_inner = $this->dom->createElement('vDescCondIncond');
-			$valores_inner->appendChild($descontos_inner);
+        if ($temDescIncond || $temDescCond) {
+            $descontos_inner = $this->dom->createElement('vDescCondIncond');
+            $valores_inner->appendChild($descontos_inner);
 
-			$this->dom->addChild($descontos_inner, 'vDescIncond', $vDescIncond, false);
-			$this->dom->addChild($descontos_inner, 'vDescCond',   $vDescCond,   false);
-		}
+            $this->dom->addChild($descontos_inner, 'vDescIncond', $vDescIncond, false);
+            $this->dom->addChild($descontos_inner, 'vDescCond', $vDescCond, false);
+        }
 
-
-        //TODO Fazer grupo vDedRed
+        // TODO Fazer grupo vDedRed
 
         $trib_inner = $this->dom->createElement('trib');
         $valores_inner->appendChild($trib_inner);
@@ -971,8 +970,8 @@ class Dps implements DpsInterface
             true
         );
 
-        if (isset($this->std->infdps->valores->trib->tribmun->tribissqn) && $this->std->infdps->valores->trib->tribmun->tribissqn == 
-                2 && isset($this->std->infdps->valores->trib->tribmun->tpimunidade)) {
+        if (isset($this->std->infdps->valores->trib->tribmun->tribissqn) && 2 ==
+                $this->std->infdps->valores->trib->tribmun->tribissqn && isset($this->std->infdps->valores->trib->tribmun->tpimunidade)) {
             $this->dom->addChild(
                 $tribmun_inner,
                 'tpImunidade',
@@ -981,7 +980,7 @@ class Dps implements DpsInterface
             );
         }
 
-        if(isset($this->std->infdps->valores->trib->tribmun->tribissqn) && $this->std->infdps->valores->trib->tribmun->tribissqn == 3){
+        if (isset($this->std->infdps->valores->trib->tribmun->tribissqn) && 3 == $this->std->infdps->valores->trib->tribmun->tribissqn) {
             $this->dom->addChild(
                 $tribmun_inner,
                 'cPaisResult',
@@ -1633,13 +1632,26 @@ class Dps implements DpsInterface
             true
         );
 
+        // nPedRegEvento é obrigatório (XSD TCInfPedReg) e vem entre chNFSe e o
+        // grupo do evento. Para eventos que ocorrem uma única vez — cancelamento —
+        // vale 1; nos repetíveis, precisa ser único por tipo de evento.
+        $this->dom->addChild(
+            $infpedreg_inner,
+            'nPedRegEvento',
+            $this->numeroPedidoEvento(),
+            true
+        );
+
         if (isset($this->std->infpedreg->e101101)) {
             $e101101_inner = $this->dom->createElement('e101101');
             $infpedreg_inner->appendChild($e101101_inner);
+
+            // xDesc é enumeração de valor fixo no XSD — deriva do próprio evento
+            // em vez de confiar no payload, que erraria acento/grafia.
             $this->dom->addChild(
                 $e101101_inner,
                 'xDesc',
-                $this->std->infpedreg->e101101->xdesc,
+                'Cancelamento de NFS-e',
                 true
             );
             $this->dom->addChild(
@@ -1654,11 +1666,40 @@ class Dps implements DpsInterface
                 $this->std->infpedreg->e101101->xmotivo,
                 true
             );
+        } elseif (isset($this->std->infpedreg->e105102)) {
+            $e105102_inner = $this->dom->createElement('e105102');
+            $infpedreg_inner->appendChild($e105102_inner);
+
+            // Grafia sem cedilha/til é a do XSD — não "corrigir".
+            $this->dom->addChild(
+                $e105102_inner,
+                'xDesc',
+                'Cancelamento de NFS-e por Substituicao',
+                true
+            );
+            $this->dom->addChild(
+                $e105102_inner,
+                'cMotivo',
+                $this->std->infpedreg->e105102->cmotivo,
+                true
+            );
+
+            if (isset($this->std->infpedreg->e105102->xmotivo)) {
+                $this->dom->addChild(
+                    $e105102_inner,
+                    'xMotivo',
+                    $this->std->infpedreg->e105102->xmotivo
+                );
+            }
+
+            $this->dom->addChild(
+                $e105102_inner,
+                'chSubstituta',
+                $this->std->infpedreg->e105102->chsubstituta,
+                true
+            );
         }
 
-        $dps = $this->dom->createElement('DPS');
-        $dps->setAttribute('versao', $this->std->version);
-        $dps->setAttribute('xmlns', 'http://www.sped.fazenda.gov.br/nfse');
         $this->evento->appendChild($infpedreg_inner);
         $this->dom->appendChild($this->evento);
 
@@ -1862,19 +1903,36 @@ class Dps implements DpsInterface
         } else {
             $inscricao = $this->std->infdps->prest->cpf;
         }
-        $string .= mb_str_pad((string) $inscricao, 14, '0', STR_PAD_LEFT); // Inscrição Federal (14 - CPF completar com 000 à esquerda) +
-        $string .= mb_str_pad((string) $this->std->infdps->serie, 5, '0', STR_PAD_LEFT); // Série DPS (5) +
-        $string .= mb_str_pad((string) $this->std->infdps->ndps, 15, '0', STR_PAD_LEFT); // Série DPS (5) +
+        // str_pad e não mb_str_pad: são dígitos ASCII, e mb_str_pad só existe no PHP 8.4
+        // (o pacote declara ^8.1 no composer).
+        $string .= str_pad((string) $inscricao, 14, '0', STR_PAD_LEFT); // Inscrição Federal (14 - CPF completar com 000 à esquerda) +
+        $string .= str_pad((string) $this->std->infdps->serie, 5, '0', STR_PAD_LEFT); // Série DPS (5) +
+        $string .= str_pad((string) $this->std->infdps->ndps, 15, '0', STR_PAD_LEFT); // Número da DPS (15) +
         $this->dpsId = $string;
 
         return $string;
     }
 
+    /**
+     * Número do pedido de registro do evento.
+     *
+     * Default 1: cancelamento ocorre uma única vez por NFS-e. Eventos repetíveis
+     * precisam informar um número único por tipo.
+     */
+    private function numeroPedidoEvento(): string
+    {
+        return (string) ($this->std->infpedreg->npedregevento ?? 1);
+    }
+
     private function generatePre()
     {
+        // XSD TSIdPedRefEvt: "PRE" + chave(50) + tipo do evento(6) + nPedRegEvento(3),
+        // totalizando 62 chars. O nPedRegEvento vai zero-padded aqui, mas o elemento
+        // <nPedRegEvento> é TSNum3Dig e NÃO aceita zero à esquerda.
         $string = 'PRE';
         $string .= $this->std->infpedreg->chnfse; // Chave de acesso da NFS-e (50) +
-        $string .= $this->codigoEvento(); // Código do evento (6)
+        $string .= $this->codigoEvento(); // Código do evento (6) +
+        $string .= str_pad($this->numeroPedidoEvento(), 3, '0', STR_PAD_LEFT); // nPedRegEvento (3)
         $this->preId = $string;
 
         return $string;

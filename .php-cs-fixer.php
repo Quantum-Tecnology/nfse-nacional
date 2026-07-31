@@ -24,7 +24,11 @@ return (new PhpCsFixer\Config())
         'statement_indentation'                       => true,
         'method_chaining_indentation'                 => true,
         'no_useless_else'                             => true,
-        'mb_str_functions'                            => true,
+        // DESLIGADA de proposito: converte trim()->mb_trim() e str_pad()->mb_str_pad(),
+        // que so existem no PHP 8.4 — o composer declara ^8.1. A regra reintroduzia
+        // o bug a cada formatacao (o pacote instalava em 8.1-8.3 e quebrava na
+        // primeira emissao). Ver RegressaoTest::naoUsaFuncoesExclusivasDoPhp84.
+        'mb_str_functions'                            => false,
         'array_push'                                  => true,
         'modernize_types_casting'                     => true,
         //'new_with_parentheses'                        => true,

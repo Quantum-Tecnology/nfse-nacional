@@ -479,7 +479,7 @@ final class DpsIbsCbsTest extends TestCase
 
         $valido = $dom->schemaValidate(__DIR__ . '/../storage/schemes/DPS_v1.01.xsd');
         $erros  = array_map(
-            static fn ($erro) => mb_trim($erro->message),
+            static fn ($erro) => trim($erro->message),
             libxml_get_errors()
         );
 
@@ -499,7 +499,7 @@ final class DpsIbsCbsTest extends TestCase
         $dom->formatOutput       = true;
         $dom->appendChild($dom->importNode($node, true));
 
-        return mb_trim($dom->saveXML($dom->documentElement));
+        return trim($dom->saveXML($dom->documentElement));
     }
 
     private function ibsCbsDaNotaAutorizada(): DOMNode

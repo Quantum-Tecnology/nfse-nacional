@@ -10,6 +10,32 @@ Este é um **fork mantido pela [Quantum Tecnology](https://github.com/Quantum-Te
 
 Além de tudo que já existia no pacote original, esta versão adiciona:
 
+### 🏛️ Destaque de IBS/CBS (Reforma Tributária — EC 132/2023)
+O grupo `<IBSCBS>` do DPS é gerado a partir de `$std->infDPS->IBSCBS`. É **opcional**: sem ele no payload, o XML sai exatamente como antes.
+
+No DPS você **apenas declara a situação tributária** — `CST` e `cClassTrib`. As alíquotas e os valores de IBS/CBS são calculados pelo Ambiente de Dados Nacional e voltam no `<infNFSe>` da NFS-e autorizada; **não envie valores**.
+
+```php
+$std->infDPS->IBSCBS = (object) [
+    'finNFSe'  => '0',        // hoje o XSD só aceita 0
+    'indFinal' => '0',        // 0 = não é consumidor final
+    'cIndOp'   => '030101',   // 6 dígitos (tabela oficial)
+    'indDest'  => '0',        // 0 = tomador é o destinatário
+    'valores'  => (object) [
+        'trib' => (object) [
+            'gIBSCBS' => (object) [
+                'CST'        => '000',     // 3 dígitos
+                'cClassTrib' => '000001',  // 6 dígitos
+            ],
+        ],
+    ],
+];
+```
+
+Grupos opcionais suportados: `tpOper`, `gRefNFSe` (até 99 chaves), `tpEnteGov`, `dest` (com endereço nacional ou exterior), `imovel` (`cCIB` ou endereço), `gReeRepRes` (até 1000 documentos), `cCredPres`, `gTribRegular` e `gDif`.
+
+> ⚠️ **Os códigos são strings, nunca inteiros.** `CST`, `cClassTrib`, `cIndOp` e `cCredPres` têm zero à esquerda significativo — um cast para `int` transforma `'000001'` em `1` e a nota é rejeitada.
+
 ### 🧭 Roteamento inteligente por município (emissão × cancelamento × consulta)
 Municípios com **emissor próprio** (ex.: **Americana-SP**) aceitam o leiaute nacional, mas num endpoint específico da prefeitura — enquanto as **consultas** continuam no Ambiente Nacional (ADN/SEFIN).
 
@@ -37,8 +63,34 @@ O namespace passou a ser **`QuantumTecnology\NfseNacional`**, alinhado aos demai
 
 > ⚠️ **Breaking change** ao migrar de versões anteriores: troque os `use Hadder\NfseNacional\...` por `use QuantumTecnology\NfseNacional\...`.
 
+### 🔁 Eventos: cancelamento e cancelamento por substituição
+O `renderEvento()` **nunca gerou XML válido** em versões anteriores: faltava o elemento obrigatório `<nPedRegEvento>` e o atributo `Id` tinha 59 caracteres onde o schema exige 62. Na prática, **nenhum cancelamento era aceito** pelo Ambiente Nacional. Corrigido.
+
+Além do `e101101` (cancelamento), agora também é gerado o corpo do **`e105102`** (cancelamento por substituição), que antes tinha o código mapeado mas produzia um `infPedReg` sem o grupo do evento.
+
+```php
+$std->infPedReg->e101101 = (object) [
+    'cMotivo' => '1',                              // TSCodJustCanc: 1, 2 ou 9
+    'xMotivo' => 'Erro na emissao da nota fiscal',
+];
+
+// Substituição usa outra enumeração — com zero à esquerda:
+$std->infPedReg->e105102 = (object) [
+    'cMotivo'      => '01',                        // TSCodJustSubst: 01..05, 99
+    'chSubstituta' => '...',                       // chave da NFS-e substituta
+];
+```
+
+O `xDesc` **não precisa ser informado** — é enumeração de valor fixo no schema e o pacote o deriva do próprio evento (a grafia do 105102, por exemplo, não leva cedilha). O `nPedRegEvento` assume `1` por padrão; informe-o em `$std->infPedReg->nPedRegEvento` nos eventos que podem se repetir.
+
+### 🛡️ Compatibilidade de versão do PHP
+`generateId()` e o cliente HTTP usavam `mb_str_pad()` e `mb_trim()`, **funções exclusivas do PHP 8.4**, enquanto o pacote declara `^8.1`. Em PHP 8.1–8.3 a instalação passava sem aviso e o pacote quebrava na primeira emissão. Trocadas por `str_pad()`/`trim()`.
+
+> A regra `mb_str_functions` do `.php-cs-fixer.php` foi **desligada de propósito**: ela reconvertia essas chamadas automaticamente, reintroduzindo o bug a cada formatação.
+
 ### 🧹 Limpeza e correções
-- Remoção de código morto e de um `dump()` que vazava no output em produção.
+- **`cNBS` é obrigatório** no schema e era emitido sob `isset()`, como se fosse opcional — a nota saía sem ele e a SEFAZ rejeitava com `L2103`.
+- Remoção de código morto (incluindo um elemento `<DPS>` órfão criado dentro do gerador de eventos) e de um `dump()` que vazava no output em produção.
 - Correção de recursão sem `return` na geração de nomes de arquivos temporários de certificado.
 
 ## Instalação
@@ -51,8 +103,17 @@ composer require quantumtecnology/nfse-nacional
 
 ### Requisitos
 
-- PHP 8.2+
+- PHP 8.1+
 - ext-dom, ext-curl, ext-zlib, ext-openssl, ext-mbstring
+
+### Testes
+
+```bash
+composer install
+composer test          # ou: vendor/bin/phpunit
+```
+
+A suíte valida o XML gerado contra os **XSDs oficiais v1.01** (`storage/schemes/`) e inclui um teste de paridade com uma NFS-e real autorizada pelo Ambiente Nacional (fixture anonimizada em `tests/Fixtures/`).
 
 ## Serviços implementados
 

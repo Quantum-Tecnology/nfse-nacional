@@ -177,17 +177,20 @@ A suíte valida o XML gerado contra os **XSDs oficiais v1.01** (`storage/schemes
 
 ## Serviços implementados
 
-| Método | Descrição |
-|---|---|
-| `enviaDps` | Emite a NFS-e (envia o DPS) |
-| `cancelaNfse` | Cancela uma NFS-e autorizada |
-| `consultarNfseChave` | Consulta a NFS-e pela chave (XML) |
-| `consultarDpsChave` | Consulta o DPS pela chave |
-| `consultarNfseEventos` | Consulta eventos de uma NFS-e |
-| `consultarDanfse` | Baixa a DANFSe (PDF oficial) do ADN |
-| `Danfse` / `DanfseSimples` | Gera a DANFSe **localmente** a partir do XML |
+| Método | Descrição | Exemplo |
+|---|---|---|
+| `enviaDps` | Emite a NFS-e (envia o DPS) | [MakeDps.php](examples/MakeDps.php) |
+| `enviaDps` **com IBS/CBS** | Emissão com o destaque da Reforma Tributária | [MakeDpsIbsCbs.php](examples/MakeDpsIbsCbs.php) |
+| `cancelaNfse` (`e101101`) | Cancela uma NFS-e autorizada | [CancelaNfse.php](examples/CancelaNfse.php) |
+| `cancelaNfse` (`e105102`) | Cancelamento por **substituição** | [SubstituiNfse.php](examples/SubstituiNfse.php) |
+| `consultarNfseChave` | Consulta a NFS-e pela chave (XML) | [ConsultaNfseChave.php](examples/ConsultaNfseChave.php) |
+| `consultarDpsChave` | Consulta o DPS pela chave | [ConsultaDpsChave.php](examples/ConsultaDpsChave.php) |
+| `consultarNfseEventos` | Consulta eventos de uma NFS-e | [ConsultaNfseEventos.php](examples/ConsultaNfseEventos.php) |
+| `consultarDanfse` | Baixa a DANFSe (PDF oficial) do ADN | [ConsultaDanfse.php](examples/ConsultaDanfse.php) |
+| `Danfse` / `DanfseSimples` | Gera a DANFSe **localmente** a partir do XML | [GeraDanfseLocal.php](examples/GeraDanfseLocal.php) |
+| `Dps::validate()` / `getErrors()` | Valida o XML antes de transmitir | [MakeDpsIbsCbs.php](examples/MakeDpsIbsCbs.php) |
 
-Exemplos de uso estão na pasta [`exemples/`](exemples/).
+Todos os exemplos estão em [`examples/`](examples/) e rodam em PHP puro — basta ajustar o certificado e os dados do emitente.
 
 ## ⚠️ Avisos importantes
 

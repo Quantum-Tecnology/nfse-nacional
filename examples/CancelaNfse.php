@@ -14,7 +14,7 @@ try {
     $content       = file_get_contents('certificado.pfx');
     $password      = 'senha_certificado';
     $cert          = NFePHP\Common\Certificate::readPfx($content, $password);
-    $tools         = new Hadder\NfseNacional\Tools($configJson, $cert);
+    $tools         = new QuantumTecnology\NfseNacional\Tools($configJson, $cert);
 
     $std                       = new stdClass();
     $std->infPedReg            = new stdClass();
@@ -49,8 +49,8 @@ try {
     //    $std->infPedReg->e105102->chSubstituta = '00000000000000000000000000000000000000000000000000';// Chave de Acesso da NFS-e substituta.
 
     $response = $tools->cancelaNfse($std);
-    dd($response);
+    var_dump($response);
 
 } catch (Exception $e) {
-    dd($e->getMessage(), $e);
+    echo $e->getMessage(), PHP_EOL;
 }

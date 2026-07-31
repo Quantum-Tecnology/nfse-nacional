@@ -15,7 +15,7 @@ try {
     $content    = file_get_contents('certificado.pfx');
     $password   = 'senha_certificado';
     $cert       = NFePHP\Common\Certificate::readPfx($content, $password);
-    $tools      = new Hadder\NfseNacional\Tools($configJson, $cert);
+    $tools      = new QuantumTecnology\NfseNacional\Tools($configJson, $cert);
     // Informar chave NFSe
     $response = $tools->consultarDanfse('00000000000000000000000000000000000000000000000000');
     header('Content-Type: application/pdf');
@@ -26,5 +26,5 @@ try {
 
     echo $response;
 } catch (Exception $e) {
-    dd($e->getMessage(), $e);
+    echo $e->getMessage(), PHP_EOL;
 }

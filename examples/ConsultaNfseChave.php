@@ -14,17 +14,12 @@ try {
     $content       = file_get_contents('certificado.pfx');
     $password      = 'senha_certificado';
     $cert          = NFePHP\Common\Certificate::readPfx($content, $password);
-    $tools         = new Hadder\NfseNacional\Tools($configJson, $cert);
+    $tools         = new QuantumTecnology\NfseNacional\Tools($configJson, $cert);
 
-    /*
-     * Existem as pesquisas:
-     * Apenas chave (retornaria todos eventos)
-     * Chave + tipo de evento (retornaria todos os eventos daquele tipo)
-     * Chave + tipo de evento + numero sequencial (este é o único que funciona)
-     */
-    $response = $tools->consultarNfseEventos('00000000000000000000000000000000000000000000000000', '101101', 1);
-    dd($response);
+    // Informar chave da NFSe, retorna XML
+    $response = $tools->consultarNfseChave('00000000000000000000000000000000000000000000000000');
+    var_dump($response);
 
 } catch (Exception $e) {
-    dd($e->getMessage(), $e);
+    echo $e->getMessage(), PHP_EOL;
 }

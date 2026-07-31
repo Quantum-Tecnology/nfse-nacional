@@ -14,12 +14,12 @@ try {
     $content       = file_get_contents('certificado.pfx');
     $password      = 'senha_certificado';
     $cert          = NFePHP\Common\Certificate::readPfx($content, $password);
-    $tools         = new Hadder\NfseNacional\Tools($configJson, $cert);
+    $tools         = new QuantumTecnology\NfseNacional\Tools($configJson, $cert);
+    // Informar chave da DPS para obter a chave da NFSe
+    $response = $tools->consultarDpsChave('DPS000000000000000000000000000000000000000000');
 
-    // Informar chave da NFSe, retorna XML
-    $response = $tools->consultarNfseChave('00000000000000000000000000000000000000000000000000');
-    dd($response);
+    var_dump($response);
 
 } catch (Exception $e) {
-    dd($e->getMessage(), $e);
+    echo $e->getMessage(), PHP_EOL;
 }

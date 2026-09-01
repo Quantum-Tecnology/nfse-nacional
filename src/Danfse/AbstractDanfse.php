@@ -31,6 +31,11 @@ use Exception;
 abstract class AbstractDanfse extends DaCommon
 {
     /**
+     * Fonte com acentuação distribuída pelo pacote (ver storage/fonts/).
+     */
+    const FONTE_ACENTUADA = 'dejavusanscondensed';
+
+    /**
      * Tamanho do Papel
      * @var string
      */
@@ -554,8 +559,9 @@ abstract class AbstractDanfse extends DaCommon
             $this->orientacao = 'P';
         }
 
-        $this->pdf = new Pdf($this->orientacao, 'mm', $this->papel);
-        
+        $this->pdf = new PdfComFontes($this->orientacao, 'mm', $this->papel);
+        $this->registraFonteAcentuada();
+
         // Define dimensões da página
         if ($this->orientacao == 'L') {
             $this->maxW = 297;
@@ -638,9 +644,9 @@ abstract class AbstractDanfse extends DaCommon
         
         $this->pdf->setFont($this->fontePadrao, 'B', 7);
         $this->pdf->setXY($x, $y);
-        $this->pdf->cell($w3, 4, 'Numero da NFS-e', 0, 0, 'L');
-        $this->pdf->cell($w3, 4, 'Competencia da NFS-e', 0, 0, 'L');
-        $this->pdf->cell($w3, 4, 'Data e Hora de Emissao da NFS-e', 0, 1, 'L');
+        $this->pdf->cell($w3, 4, 'Número da NFS-e', 0, 0, 'L');
+        $this->pdf->cell($w3, 4, 'Competência da NFS-e', 0, 0, 'L');
+        $this->pdf->cell($w3, 4, 'Data e Hora da emissão da NFS-e', 0, 1, 'L');
         
         $this->pdf->setFont($this->fontePadrao, '', 7);
         $this->pdf->setX($x);
@@ -655,9 +661,9 @@ abstract class AbstractDanfse extends DaCommon
         $y = $this->pdf->getY();
         $this->pdf->setFont($this->fontePadrao, 'B', 7);
         $this->pdf->setXY($x, $y);
-        $this->pdf->cell($w3, 4, 'Numero de DPS', 0, 0, 'L');
-        $this->pdf->cell($w3, 4, 'Serie do DPS', 0, 0, 'L');
-        $this->pdf->cell($w3, 4, 'Data e Hora de Emissao do DPS', 0, 1, 'L');
+        $this->pdf->cell($w3, 4, 'Número da DPS', 0, 0, 'L');
+        $this->pdf->cell($w3, 4, 'Série da DPS', 0, 0, 'L');
+        $this->pdf->cell($w3, 4, 'Data e Hora da emissão da DPS', 0, 1, 'L');
         
         $this->pdf->setFont($this->fontePadrao, '', 7);
         $this->pdf->setX($x);
@@ -734,7 +740,7 @@ abstract class AbstractDanfse extends DaCommon
         // Título
         $this->pdf->setFont($this->fontePadrao, 'B', 8);
         $this->pdf->setXY($x, $y);
-        $this->pdf->cell($this->wPrint, 5, 'Emitente da NFS-e', 1, 1, 'L', true);
+        $this->pdf->cell($this->wPrint, 5, 'EMITENTE DA NFS-e', 1, 1, 'L', true);
 
         $y = $this->pdf->getY();
         $w3 = $this->wPrint / 3;
@@ -744,7 +750,7 @@ abstract class AbstractDanfse extends DaCommon
         $this->pdf->setFont($this->fontePadrao, 'B', 7);
         $this->pdf->setXY($x, $y);
         $this->pdf->cell($w3, 3, 'CNPJ / CPF / NIF', 0, 0, 'L');
-        $this->pdf->cell($w3, 3, 'Inscricao Municipal', 0, 0, 'L');
+        $this->pdf->cell($w3, 3, 'Inscrição Municipal', 0, 0, 'L');
         $this->pdf->cell($w3, 3, 'Telefone', 0, 1, 'L');
         
         $this->pdf->setFont($this->fontePadrao, '', 7);
@@ -771,7 +777,7 @@ abstract class AbstractDanfse extends DaCommon
         $y = $this->pdf->getY();
         $this->pdf->setFont($this->fontePadrao, 'B', 7);
         $this->pdf->setXY($x, $y);
-        $this->pdf->cell($this->wPrint, 3, 'Endereco', 0, 1, 'L');
+        $this->pdf->cell($this->wPrint, 3, 'Endereço', 0, 1, 'L');
         
         $this->pdf->setFont($this->fontePadrao, '', 7);
         $this->pdf->setX($x);
@@ -785,7 +791,7 @@ abstract class AbstractDanfse extends DaCommon
         $this->pdf->setFont($this->fontePadrao, 'B', 7);
         $this->pdf->setXY($x, $y);
         $this->pdf->cell($w2, 3, 'E-mail', 0, 0, 'L');
-        $this->pdf->cell($w4, 3, 'Municipio', 0, 0, 'L');
+        $this->pdf->cell($w4, 3, 'Município', 0, 0, 'L');
         $this->pdf->cell($w4, 3, 'CEP', 0, 1, 'L');
 
         $this->pdf->setFont($this->fontePadrao, '', 7);
@@ -801,8 +807,8 @@ abstract class AbstractDanfse extends DaCommon
 
         $this->pdf->setFont($this->fontePadrao, 'B', 7);
         $this->pdf->setXY($x, $y);
-        $this->pdf->cell($w2, 3, 'Simples Nacional na Data de Competencia', 0, 0, 'L');
-        $this->pdf->cell($w2, 3, 'Regime de Apuracao Tributaria pelo SN', 0, 1, 'L');
+        $this->pdf->cell($w2, 3, 'Simples Nacional na Data de Competência', 0, 0, 'L');
+        $this->pdf->cell($w2, 3, 'Regime de Apuração Tributária pelo SN', 0, 1, 'L');
 
         $this->pdf->setFont($this->fontePadrao, '', 6);
         $this->pdf->setX($x);
@@ -829,7 +835,7 @@ abstract class AbstractDanfse extends DaCommon
         // Título
         $this->pdf->setFont($this->fontePadrao, 'B', 8);
         $this->pdf->setXY($x, $y);
-        $this->pdf->cell($this->wPrint, 5, 'TOMADOR DE SERVICO', 1, 1, 'L', true);
+        $this->pdf->cell($this->wPrint, 5, 'TOMADOR DO SERVIÇO', 1, 1, 'L', true);
 
         $y = $this->pdf->getY();
         $w3 = $this->wPrint / 3;
@@ -839,7 +845,7 @@ abstract class AbstractDanfse extends DaCommon
         $this->pdf->setFont($this->fontePadrao, 'B', 7);
         $this->pdf->setXY($x, $y);
         $this->pdf->cell($w3, 3, 'CNPJ / CPF / NIF', 0, 0, 'L');
-        $this->pdf->cell($w3, 3, 'Inscricao Municipal', 0, 0, 'L');
+        $this->pdf->cell($w3, 3, 'Inscrição Municipal', 0, 0, 'L');
         $this->pdf->cell($w3, 3, 'Telefone', 0, 1, 'L');
         
         $this->pdf->setFont($this->fontePadrao, '', 7);
@@ -867,7 +873,7 @@ abstract class AbstractDanfse extends DaCommon
         $y = $this->pdf->getY();
         $this->pdf->setFont($this->fontePadrao, 'B', 7);
         $this->pdf->setXY($x, $y);
-        $this->pdf->cell($this->wPrint, 3, 'Endereco', 0, 1, 'L');
+        $this->pdf->cell($this->wPrint, 3, 'Endereço', 0, 1, 'L');
         
         $this->pdf->setFont($this->fontePadrao, '', 7);
         $this->pdf->setX($x);
@@ -881,7 +887,7 @@ abstract class AbstractDanfse extends DaCommon
         $this->pdf->setXY($x, $y);
         $this->pdf->cell($w3 + $w4, 3, 'E-mail', 0, 0, 'L');
         $this->pdf->cell($w4, 3, 'CEP', 0, 0, 'L');
-        $this->pdf->cell($w3 - $w4, 3, 'Municipio', 0, 1, 'L');
+        $this->pdf->cell($w3 - $w4, 3, 'Município', 0, 1, 'L');
         
         $this->pdf->setFont($this->fontePadrao, '', 7);
         $this->pdf->setX($x);
@@ -909,7 +915,7 @@ abstract class AbstractDanfse extends DaCommon
         // Título SERVIÇO PRESTADO
         $this->pdf->setFont($this->fontePadrao, 'B', 8);
         $this->pdf->setXY($x, $y);
-        $this->pdf->cell($this->wPrint, 5, 'SERVICO PRESTADO', 1, 1, 'L', true);
+        $this->pdf->cell($this->wPrint, 5, 'SERVIÇO PRESTADO', 1, 1, 'L', true);
 
         $y = $this->pdf->getY();
         $w4 = $this->wPrint / 4;
@@ -917,10 +923,10 @@ abstract class AbstractDanfse extends DaCommon
         // Linha 1: Códigos e Local
         $this->pdf->setFont($this->fontePadrao, 'B', 7);
         $this->pdf->setXY($x, $y);
-        $this->pdf->cell($w4, 3, 'Codigo de Tributacao Nacional', 0, 0, 'L');
-        $this->pdf->cell($w4, 3, 'Codigo de Tributacao Municipal', 0, 0, 'L');
-        $this->pdf->cell($w4, 3, 'Local da Prestacao', 0, 0, 'L');
-        $this->pdf->cell($w4, 3, 'Pais da Prestacao', 0, 1, 'L');
+        $this->pdf->cell($w4, 3, 'Código de Tributação Nacional', 0, 0, 'L');
+        $this->pdf->cell($w4, 3, 'Código de Tributação Municipal', 0, 0, 'L');
+        $this->pdf->cell($w4, 3, 'Local da Prestação', 0, 0, 'L');
+        $this->pdf->cell($w4, 3, 'País da Prestação', 0, 1, 'L');
         
         // O oficial imprime código E descrição ("08.02.01 - 08.02 - Instrução,
         // treinamento..."); a descrição vem em xTribNac/xTribMun do XML
@@ -937,7 +943,7 @@ abstract class AbstractDanfse extends DaCommon
         )), 0, 0, 'L');
         $localPrest = $this->servico['local_prestacao'] ?? '';
         if ('0000000' === $localPrest) {
-            $localPrest = 'Aguas Maritimas';
+            $localPrest = 'Águas Marítimas';
         }
         $this->pdf->cell($w4, 3, $this->ouTraco($localPrest), 0, 0, 'L');
         $this->pdf->cell($w4, 3, $this->ouTraco($this->nomePais($this->servico['pais_prestacao'] ?? '')), 0, 1, 'L');
@@ -946,7 +952,7 @@ abstract class AbstractDanfse extends DaCommon
         $y = $this->pdf->getY();
         $this->pdf->setFont($this->fontePadrao, 'B', 7);
         $this->pdf->setXY($x, $y);
-        $this->pdf->cell($this->wPrint, 3, 'Descricao do Servico', 0, 1, 'L');
+        $this->pdf->cell($this->wPrint, 3, 'Descrição do Serviço', 0, 1, 'L');
         
         $this->pdf->setFont($this->fontePadrao, '', 7);
         $this->pdf->setX($x);
@@ -957,7 +963,7 @@ abstract class AbstractDanfse extends DaCommon
         $y = $this->pdf->getY() + 0.5;
         $this->pdf->setFont($this->fontePadrao, 'B', 7);
         $this->pdf->setXY($x, $y);
-        $this->pdf->cell($this->wPrint, 3, 'TRIBUTACAO DO ISSQN', 0, 1, 'L');
+        $this->pdf->cell($this->wPrint, 3, 'TRIBUTAÇÃO MUNICIPAL', 0, 1, 'L');
         
         $y = $this->pdf->getY();
         $valores = $this->servico['valores'] ?? [];
@@ -965,15 +971,15 @@ abstract class AbstractDanfse extends DaCommon
         // Primeira linha de tributação
         $this->pdf->setFont($this->fontePadrao, 'B', 6);
         $this->pdf->setXY($x, $y);
-        $this->pdf->cell($w4, 2.5, 'Tributacao Tributavel', 0, 0, 'L');
-        $this->pdf->cell($w4, 2.5, 'Pais Resultado da Prestacao de Servico', 0, 0, 'L');
-        $this->pdf->cell($w4, 2.5, 'Municipio de Incidencia do ISSQN', 0, 0, 'L');
-        $this->pdf->cell($w4, 2.5, 'Regime Especial de Tributacao', 0, 1, 'L');
+        $this->pdf->cell($w4, 2.5, 'Tributação do ISSQN', 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, 'País Resultado da Prestação do Serviço', 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, 'Município de Incidência do ISSQN', 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, 'Regime Especial de Tributação', 0, 1, 'L');
         
         $this->pdf->setFont($this->fontePadrao, '', 6);
         $this->pdf->setX($x);
         $tipoTrib = $valores['tipo_tributacao'] ?? 1;
-        $tribTexto = 1 == $tipoTrib ? 'Operacao Tributavel' : 'Nao Tributavel';
+        $tribTexto = 1 == $tipoTrib ? 'Operação Tributável' : 'Não Tributável';
         $this->pdf->cell($w4, 2.5, $tribTexto, 0, 0, 'L');
         // Antes fixos em 'Brasil' e 'Nenhum', ignorando cPaisResult e regEspTrib
         // que já vinham parseados.
@@ -992,14 +998,14 @@ abstract class AbstractDanfse extends DaCommon
         $this->pdf->setFont($this->fontePadrao, 'B', 6);
         $this->pdf->setXY($x, $y);
         $this->pdf->cell($w4, 2.5, 'Tipo de Imunidade', 0, 0, 'L');
-        $this->pdf->cell($w4, 2.5, 'Suspensao da Exigibilidade do ISSQN', 0, 0, 'L');
-        $this->pdf->cell($w4, 2.5, 'Numero Processo Suspenso', 0, 0, 'L');
-        $this->pdf->cell($w4, 2.5, 'Beneficio Municipal', 0, 1, 'L');
+        $this->pdf->cell($w4, 2.5, 'Suspensão da Exigibilidade do ISSQN', 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, 'Número Processo Suspensão', 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, 'Benefício Municipal', 0, 1, 'L');
         
         $this->pdf->setFont($this->fontePadrao, '', 6);
         $this->pdf->setX($x);
-        $this->pdf->cell($w4, 2.5, 'Nao', 0, 0, 'L');
-        $this->pdf->cell($w4, 2.5, 'Nao', 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, 'Não', 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, 'Não', 0, 0, 'L');
         $this->pdf->cell($w4, 2.5, '', 0, 0, 'L');
         $this->pdf->cell($w4, 2.5, '', 0, 1, 'L');
 
@@ -1024,10 +1030,10 @@ abstract class AbstractDanfse extends DaCommon
         // Seção: Valores do Serviço e ISS
         $this->pdf->setFont($this->fontePadrao, 'B', 7);
         $this->pdf->setXY($x, $y);
-        $this->pdf->cell($w4, 3, 'Valor do Servico', 0, 0, 'L');
+        $this->pdf->cell($w4, 3, 'Valor do Serviço', 0, 0, 'L');
         $this->pdf->cell($w4, 3, 'Desconto Incondicionado', 0, 0, 'L');
-        $this->pdf->cell($w4, 3, 'Total Deducoes/Reducoes', 0, 0, 'L');
-        $this->pdf->cell($w4, 3, 'Calculo do BM', 0, 1, 'L');
+        $this->pdf->cell($w4, 3, 'Total Deduções/Reduções', 0, 0, 'L');
+        $this->pdf->cell($w4, 3, 'Cálculo do BM', 0, 1, 'L');
         
         $this->pdf->setFont($this->fontePadrao, '', 7);
         $this->pdf->setX($x);
@@ -1041,8 +1047,8 @@ abstract class AbstractDanfse extends DaCommon
         $this->pdf->setFont($this->fontePadrao, 'B', 7);
         $this->pdf->setXY($x, $y);
         $this->pdf->cell($w4, 3, 'BC ISSQN', 0, 0, 'L');
-        $this->pdf->cell($w4, 3, 'Aliquota Aplicada', 0, 0, 'L');
-        $this->pdf->cell($w4, 3, 'Retencao do ISSQN', 0, 0, 'L');
+        $this->pdf->cell($w4, 3, 'Alíquota Aplicada', 0, 0, 'L');
+        $this->pdf->cell($w4, 3, 'Retenção do ISSQN', 0, 0, 'L');
         $this->pdf->cell($w4, 3, 'ISSQN Apurado', 0, 1, 'L');
         
         $this->pdf->setFont($this->fontePadrao, '', 7);
@@ -1053,7 +1059,7 @@ abstract class AbstractDanfse extends DaCommon
         // tpRetISSQN: 1 = Retido pelo tomador/intermediário, 2 = Não retido.
         // Os dois ramos deste ternário eram idênticos ('Nao Retido'), então a
         // retenção NUNCA aparecia no documento, ainda que declarada no XML.
-        $issRetido = 1 === (int) ($valores['iss_retido'] ?? 2) ? 'Retido' : 'Nao Retido';
+        $issRetido = 1 === (int) ($valores['iss_retido'] ?? 2) ? 'Retido' : 'Não Retido';
         $this->pdf->cell($w4, 3, $issRetido, 0, 0, 'L');
         $this->pdf->cell($w4, 3, 'R$ ' . $this->formatarValor($valores['iss'] ?? 0), 0, 1, 'L');
 
@@ -1069,7 +1075,7 @@ abstract class AbstractDanfse extends DaCommon
 
         $this->pdf->setFont($this->fontePadrao, 'B', 8);
         $this->pdf->setXY($x, $y);
-        $this->pdf->cell($this->wPrint, 4, 'TRIBUTACAO FEDERAL', 1, 1, 'L', true);
+        $this->pdf->cell($this->wPrint, 4, 'TRIBUTAÇÃO FEDERAL', 1, 1, 'L', true);
 
         $y = $this->pdf->getY();
         $w5 = $this->wPrint / 5;
@@ -1091,8 +1097,8 @@ abstract class AbstractDanfse extends DaCommon
         $this->pdf->setXY($x, $y);
         $this->pdf->cell($w5, 3, 'PIS', 0, 0, 'L');
         $this->pdf->cell($w5, 3, 'COFINS', 0, 0, 'L');
-        $this->pdf->cell($w5, 3, 'Retencao do PIS/COFINS', 0, 0, 'L');
-        $this->pdf->cell($w5 * 2, 3, 'TOTAL TRIBUTACAO FEDERAL', 0, 1, 'L');
+        $this->pdf->cell($w5, 3, 'Retenção do PIS/COFINS', 0, 0, 'L');
+        $this->pdf->cell($w5 * 2, 3, 'TOTAL TRIBUTAÇÃO FEDERAL', 0, 1, 'L');
         
         $this->pdf->setFont($this->fontePadrao, '', 7);
         $this->pdf->setX($x);
@@ -1100,7 +1106,7 @@ abstract class AbstractDanfse extends DaCommon
         $this->pdf->cell($w5, 3, 'R$ ' . $this->formatarValor($valores['cofins'] ?? 0), 0, 0, 'L');
         // Idem ISSQN: os dois ramos eram 'Nao Retido'. A retenção é declarada em
         // tpRetPisCofins (1 = retido), não inferida da existência de valor.
-        $retPisCofins = 1 === (int) ($valores['ret_pis_cofins'] ?? 2) ? 'Retido' : 'Nao Retido';
+        $retPisCofins = 1 === (int) ($valores['ret_pis_cofins'] ?? 2) ? 'Retido' : 'Não Retido';
         $this->pdf->cell($w5, 3, $retPisCofins, 0, 0, 'L');
         $this->pdf->cell($w5 * 2, 3, 'R$ ' . $this->formatarValor($outrasRetencoes), 0, 1, 'L');
 
@@ -1117,7 +1123,7 @@ abstract class AbstractDanfse extends DaCommon
         $y = $this->pdf->getY();
         $this->pdf->setFont($this->fontePadrao, 'B', 7);
         $this->pdf->setXY($x, $y);
-        $this->pdf->cell($w4, 3, 'Valor do Servico', 0, 0, 'L');
+        $this->pdf->cell($w4, 3, 'Valor do Serviço', 0, 0, 'L');
         $this->pdf->cell($w4, 3, 'Desconto Condicionado', 0, 0, 'L');
         $this->pdf->cell($w4, 3, 'Desconto Incondicionado', 0, 0, 'L');
         $this->pdf->cell($w4, 3, 'ISSQN Retido', 0, 1, 'L');
@@ -1151,7 +1157,7 @@ abstract class AbstractDanfse extends DaCommon
         $y = $this->pdf->getY() + 0.5;
         $this->pdf->setFont($this->fontePadrao, 'B', 9);
         $this->pdf->setXY($x, $y);
-        $this->pdf->cell($w2, 5, 'Valor Liquido da NFS-e', 1, 0, 'L', true);
+        $this->pdf->cell($w2, 5, 'Valor Líquido da NFS-e', 1, 0, 'L', true);
         $this->pdf->cell($w2, 5, 'R$ ' . $this->formatarValor($valorLiquido), 1, 1, 'R', true);
 
         // Linha separadora
@@ -1180,15 +1186,15 @@ abstract class AbstractDanfse extends DaCommon
         // Título da seção
         $this->pdf->setFont($this->fontePadrao, 'B', 8);
         $this->pdf->setXY($x, $y);
-        $this->pdf->cell($this->wPrint, 5, 'TRIBUTACAO IBS / CBS (REFORMA TRIBUTARIA)', 1, 1, 'L', true);
+        $this->pdf->cell($this->wPrint, 5, 'TRIBUTAÇÃO IBS / CBS (REFORMA TRIBUTÁRIA)', 1, 1, 'L', true);
 
         // Situação tributária e localidade de incidência
         $y = $this->pdf->getY();
         $this->pdf->setFont($this->fontePadrao, 'B', 6);
         $this->pdf->setXY($x, $y);
         $this->pdf->cell($w4, 2.5, 'CST', 0, 0, 'L');
-        $this->pdf->cell($w4, 2.5, 'Classificacao Tributaria', 0, 0, 'L');
-        $this->pdf->cell($w4 * 2, 2.5, 'Municipio de Incidencia do IBS/CBS', 0, 1, 'L');
+        $this->pdf->cell($w4, 2.5, 'Classificação Tributária', 0, 0, 'L');
+        $this->pdf->cell($w4 * 2, 2.5, 'Município de Incidência do IBS/CBS', 0, 1, 'L');
 
         $this->pdf->setFont($this->fontePadrao, '', 6);
         $this->pdf->setX($x);
@@ -1200,10 +1206,10 @@ abstract class AbstractDanfse extends DaCommon
         $y = $this->pdf->getY();
         $this->pdf->setFont($this->fontePadrao, 'B', 6);
         $this->pdf->setXY($x, $y);
-        $this->pdf->cell($w4, 2.5, 'Base de Calculo IBS/CBS', 0, 0, 'L');
-        $this->pdf->cell($w4, 2.5, 'Aliquota IBS Estadual', 0, 0, 'L');
-        $this->pdf->cell($w4, 2.5, 'Aliquota IBS Municipal', 0, 0, 'L');
-        $this->pdf->cell($w4, 2.5, 'Aliquota CBS', 0, 1, 'L');
+        $this->pdf->cell($w4, 2.5, 'Base de Cálculo IBS/CBS', 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, 'Alíquota IBS Estadual', 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, 'Alíquota IBS Municipal', 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, 'Alíquota CBS', 0, 1, 'L');
 
         $this->pdf->setFont($this->fontePadrao, '', 6);
         $this->pdf->setX($x);
@@ -1269,7 +1275,7 @@ abstract class AbstractDanfse extends DaCommon
         if (!empty($this->servico['info_complementar'])) {
             $this->pdf->setFont($this->fontePadrao, 'B', 8);
             $this->pdf->setXY($x, $y);
-            $this->pdf->cell($this->wPrint, 4, 'INFORMACOES COMPLEMENTARES', 1, 1, 'L', true);
+            $this->pdf->cell($this->wPrint, 4, 'INFORMAÇÕES COMPLEMENTARES', 1, 1, 'L', true);
             
             $this->pdf->setFont($this->fontePadrao, '', 7);
             $y = $this->pdf->getY();
@@ -1358,6 +1364,34 @@ abstract class AbstractDanfse extends DaCommon
      * @return string
      */
     /**
+     * Registra a fonte acentuada do pacote como fonte padrão do documento.
+     *
+     * As fontes core do FPDF (times, helvetica) só cobrem o conjunto básico, e
+     * por isso os rótulos saíam sem acento ("TRIBUTACAO MUNICIPAL"), diferente
+     * do documento oficial. A DejaVu Sans Condensed é livre (licença em
+     * storage/fonts/LICENSE-DejaVu.txt), tem métrica condensada como a do
+     * oficial e é distribuída junto com o pacote.
+     *
+     * Falhando o registro, seguimos com a fonte core: um documento sem acento é
+     * muito melhor que documento nenhum.
+     *
+     * @return void
+     */
+    private function registraFonteAcentuada()
+    {
+        try {
+            $this->pdf->addFont(self::FONTE_ACENTUADA, '', 'dejavusanscondensed.php');
+            $this->pdf->addFont(self::FONTE_ACENTUADA, 'B', 'dejavusanscondensedb.php');
+            $this->pdf->addFont(self::FONTE_ACENTUADA, 'I', 'dejavusanscondensedi.php');
+            $this->pdf->addFont(self::FONTE_ACENTUADA, 'BI', 'dejavusanscondensedbi.php');
+
+            $this->fontePadrao = self::FONTE_ACENTUADA;
+        } catch (\Throwable $e) {
+            // Mantém a fonte core já configurada.
+        }
+    }
+
+    /**
      * Campo vazio vira "-", como no DANFSe oficial (que nunca deixa a célula em
      * branco nem imprime "R$ 0,00" onde não há valor).
      *
@@ -1422,7 +1456,7 @@ abstract class AbstractDanfse extends DaCommon
     private function getOptanteSimplesNacional($codigo)
     {
         $situacoes = [
-            '1' => 'Nao Optante',
+            '1' => 'Não Optante',
             '2' => 'Optante - Microempreendedor Individual (MEI)',
             '3' => 'Optante - Microempresa ou Empresa de Pequeno Porte (ME/EPP)',
         ];
@@ -1439,9 +1473,9 @@ abstract class AbstractDanfse extends DaCommon
     private function getRegimeApuracaoSN($codigo)
     {
         $regimes = [
-            '1' => 'Regime de apuracao dos tributos federais e municipal pelo Simples Nacional',
-            '2' => 'Regime de apuracao dos tributos federais pelo Simples Nacional e o ISSQN por fora do Simples Nacional',
-            '3' => 'Regime de apuracao dos tributos federais e municipal por fora do Simples Nacional',
+            '1' => 'Regime de apuração dos tributos federais e municipal pelo Simples Nacional',
+            '2' => 'Regime de apuração dos tributos federais pelo Simples Nacional e o ISSQN por fora do Simples Nacional',
+            '3' => 'Regime de apuração dos tributos federais e municipal por fora do Simples Nacional',
         ];
 
         return $regimes[(string) $codigo] ?? '';
@@ -1461,8 +1495,8 @@ abstract class AbstractDanfse extends DaCommon
             '1' => 'Ato Cooperado',
             '2' => 'Estimativa',
             '3' => 'Microempresa Municipal',
-            '4' => 'Notario ou Registrador',
-            '5' => 'Profissional Autonomo',
+            '4' => 'Notário ou Registrador',
+            '5' => 'Profissional Autônomo',
             '6' => 'Sociedade de Profissionais',
         ];
 
@@ -1712,7 +1746,7 @@ abstract class AbstractDanfse extends DaCommon
         $this->pdf->setXY($qrX, $y + $qrSize + 2);
         $this->pdf->cell($qrSize, 2, 'A autenticidade desta NFS-e pode ser', 0, 1, 'C');
         $this->pdf->setX($qrX);
-        $this->pdf->cell($qrSize, 2, 'verificada pela leitura deste codigo QR', 0, 1, 'C');
+        $this->pdf->cell($qrSize, 2, 'verificada pela leitura deste código QR', 0, 1, 'C');
         $this->pdf->setX($qrX);
         $this->pdf->cell($qrSize, 2, 'ou pela consulta da chave de acesso', 0, 1, 'C');
         $this->pdf->setX($qrX);

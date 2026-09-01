@@ -207,6 +207,50 @@ final class DanfseTest extends TestCase
 
     /*
     |--------------------------------------------------------------------------
+    | Acentuação dos rótulos
+    |--------------------------------------------------------------------------
+    |
+    | As fontes core do FPDF são ISO-8859-1 e não cobrem acentuação; o pacote
+    | distribui uma TTF própria (storage/fonts/). Se o registro da fonte falhar,
+    | o documento continua sendo gerado — porém sem acento, silenciosamente.
+    | Este teste é o que denuncia essa regressão.
+    */
+
+    #[Test]
+    public function imprimeOsRotulosAcentuadosComoODocumentoOficial(): void
+    {
+        $texto = $this->normaliza($this->texto('nfse_autorizada_americana_sem_ibscbs.xml'));
+
+        foreach ([
+            'TRIBUTAÇÃO MUNICIPAL',
+            'Município',
+            'Código de Tributação Nacional',
+            'SERVIÇO PRESTADO',
+            'Inscrição Municipal',
+            'Endereço',
+            'Número da NFS-e',
+            'Competência da NFS-e',
+        ] as $rotulo) {
+            $this->assertStringContainsString(
+                $rotulo,
+                $texto,
+                "Rótulo sem acento — a fonte do pacote não foi aplicada: {$rotulo}",
+            );
+        }
+    }
+
+    #[Test]
+    public function naoCorrompeAcentosVindosDoXml(): void
+    {
+        $texto = $this->texto('nfse_autorizada_uberlandia.xml');
+
+        $this->assertStringContainsString('Uberlândia', $texto);
+        // Dupla conversão de encoding produziria "UberlÃ¢ndia".
+        $this->assertStringNotContainsString('Ã¢', $texto, 'Sinal de dupla conversão UTF-8.');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Helpers
     |--------------------------------------------------------------------------
     */

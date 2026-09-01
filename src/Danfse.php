@@ -147,6 +147,6 @@ class Danfse extends AbstractDanfse
         $this->pdf->setXY($x + 2, $y + 10);
         $this->pdf->cell(30, 3, 'Nota Fiscal de', 0, 1, 'L');
         $this->pdf->setX($x + 2);
-        $this->pdf->cell(30, 3, 'Servico eletronica', 0, 0, 'L');
+        $this->pdf->cell(30, 3, 'Serviço eletrônico', 0, 0, 'L');
     }
 }

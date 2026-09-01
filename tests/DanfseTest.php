@@ -249,6 +249,19 @@ final class DanfseTest extends TestCase
         $this->assertStringNotContainsString('Ã¢', $texto, 'Sinal de dupla conversão UTF-8.');
     }
 
+    #[Test]
+    public function truncaTextoLongoSemQuebrarOsAcentos(): void
+    {
+        $texto = $this->normaliza($this->texto('nfse_autorizada_americana_sem_ibscbs.xml'));
+
+        // xTribNac desta nota é longa demais para a coluna e precisa ser cortada
+        // — o oficial faz igual. O corte não pode partir um caractere acentuado
+        // ao meio (sintoma: "Instru??o").
+        $this->assertStringContainsString('Instrução', $texto);
+        $this->assertStringNotContainsString('??', $texto, 'Corte no meio de caractere multibyte.');
+        $this->assertStringContainsString('...', $texto, 'A descrição longa deve ser truncada.');
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Helpers

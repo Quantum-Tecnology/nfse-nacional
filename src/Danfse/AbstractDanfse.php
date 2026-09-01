@@ -933,14 +933,18 @@ abstract class AbstractDanfse extends DaCommon
         // autorizado e era simplesmente ignorada.
         $this->pdf->setFont($this->fontePadrao, '', 6);
         $this->pdf->setX($x);
-        $this->pdf->cell($w4, 3, $this->ouTraco($this->codigoComDescricao(
+        // Truncado na largura da coluna: as descrições da lista de serviços são
+        // longas e, sem isso, transbordam por cima da coluna vizinha. O oficial
+        // corta do mesmo jeito ("08.02 - Instrução, treinamento, orientação
+        // pedagógica e e...").
+        $this->pdf->cell($w4, 3, $this->truncaNaLargura($this->ouTraco($this->codigoComDescricao(
             $this->servico['codigo_tributacao_nacional'] ?? '',
             $this->servico['descricao_tributacao_nacional'] ?? ''
-        )), 0, 0, 'L');
-        $this->pdf->cell($w4, 3, $this->ouTraco($this->codigoComDescricao(
+        )), $w4 - 2), 0, 0, 'L');
+        $this->pdf->cell($w4, 3, $this->truncaNaLargura($this->ouTraco($this->codigoComDescricao(
             $this->servico['codigo_tributacao_municipal'] ?? '',
             $this->servico['descricao_tributacao_municipal'] ?? ''
-        )), 0, 0, 'L');
+        )), $w4 - 2), 0, 0, 'L');
         $localPrest = $this->servico['local_prestacao'] ?? '';
         if ('0000000' === $localPrest) {
             $localPrest = 'Águas Marítimas';
@@ -1392,6 +1396,51 @@ abstract class AbstractDanfse extends DaCommon
     }
 
     /**
+     * Corta o texto na largura disponível, terminando em "...".
+     *
+     * Why: `cell()` do FPDF não recorta — o texto que não cabe simplesmente
+     * transborda e se sobrepõe à coluna vizinha. As descrições da lista de
+     * serviços (xTribNac/xTribMun) são longas o bastante para isso acontecer
+     * sempre, e o documento oficial as trunca.
+     *
+     * @param string $texto
+     * @param float  $largura Largura útil, em mm
+     * @return string
+     */
+    private function truncaNaLargura($texto, $largura)
+    {
+        $texto = (string) $texto;
+
+        if ('' === $texto || $largura <= 0) {
+            return $texto;
+        }
+
+        // getStringWidth mede no encoding da fonte, então a conversão precisa
+        // acontecer antes da medição — não só na hora de escrever.
+        if ($this->pdf->getStringWidth(PdfComFontes::paraEncodingDaFonte($texto)) <= $largura) {
+            return $texto;
+        }
+
+        // Os dados vindos do XML já foram convertidos para ISO-8859-1 no parse,
+        // enquanto os literais do código continuam em UTF-8. Cortar com a função
+        // do encoding errado parte um caractere acentuado ao meio e produz "??".
+        $encoding = mb_check_encoding($texto, 'UTF-8') ? 'UTF-8' : 'ISO-8859-1';
+
+        $reticencias = '...';
+        $corte       = $texto;
+
+        while ('' !== $corte
+            && $this->pdf->getStringWidth(
+                PdfComFontes::paraEncodingDaFonte($corte . $reticencias)
+            ) > $largura
+        ) {
+            $corte = mb_substr($corte, 0, mb_strlen($corte, $encoding) - 1, $encoding);
+        }
+
+        return $corte . $reticencias;
+    }
+
+    /**
      * Campo vazio vira "-", como no DANFSe oficial (que nunca deixa a célula em
      * branco nem imprime "R$ 0,00" onde não há valor).
      *
@@ -1736,21 +1785,24 @@ abstract class AbstractDanfse extends DaCommon
      */
     protected function renderQrCode($x, $y)
     {
-        $qrSize = 30;
-        $qrX    = $x + $this->wPrint - $qrSize - 2;
+        // O cabeçalho tem 35mm de altura e precisa acomodar o QR MAIS as três
+        // linhas do texto de autenticidade. Com o QR ocupando 30mm o texto não
+        // cabia e era escrito por cima da moldura.
+        $qrSize  = 22;
+        $textoW  = 42;
+        $qrX     = $x + $this->wPrint - $qrSize - 2;
+        $textoX  = $x + $this->wPrint - $textoW - 2;
 
         $this->desenhaQrCode($qrX, $y + 2, $qrSize);
 
         // Texto de autenticidade — o documento oficial o traz sempre sob o QR.
-        $this->pdf->setFont($this->fontePadrao, '', 5);
-        $this->pdf->setXY($qrX, $y + $qrSize + 2);
-        $this->pdf->cell($qrSize, 2, 'A autenticidade desta NFS-e pode ser', 0, 1, 'C');
-        $this->pdf->setX($qrX);
-        $this->pdf->cell($qrSize, 2, 'verificada pela leitura deste código QR', 0, 1, 'C');
-        $this->pdf->setX($qrX);
-        $this->pdf->cell($qrSize, 2, 'ou pela consulta da chave de acesso', 0, 1, 'C');
-        $this->pdf->setX($qrX);
-        $this->pdf->cell($qrSize, 2, 'no portal nacional da NFS-e', 0, 0, 'C');
+        $this->pdf->setFont($this->fontePadrao, '', 4.5);
+        $this->pdf->setXY($textoX, $y + $qrSize + 3);
+        $this->pdf->cell($textoW, 2, 'A autenticidade desta NFS-e pode ser verificada', 0, 1, 'C');
+        $this->pdf->setX($textoX);
+        $this->pdf->cell($textoW, 2, 'pela leitura deste código QR ou pela consulta da', 0, 1, 'C');
+        $this->pdf->setX($textoX);
+        $this->pdf->cell($textoW, 2, 'chave de acesso no portal nacional da NFS-e', 0, 0, 'C');
     }
 
     /**

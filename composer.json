@@ -51,7 +51,8 @@
   "require-dev": {
     "friendsofphp/php-cs-fixer": "^3.89",
     "laravel/pint": "^1.0",
-    "phpunit/phpunit": "^12.0"
+    "phpunit/phpunit": "^12.0",
+    "smalot/pdfparser": "^2.12"
   },
   "scripts": {
     "test": "phpunit"

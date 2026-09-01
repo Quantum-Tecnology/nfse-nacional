@@ -231,6 +231,9 @@ abstract class AbstractDanfse extends DaCommon
             'local_incidencia' => $infNfse['xLocIncid'] ?? '',
             'codigo_local_incidencia' => $infNfse['cLocIncid'] ?? '',
             'tributacao_nacional' => $infNfse['xTribNac'] ?? '',
+            'tributacao_municipal' => $infNfse['xTribMun'] ?? '',
+            'descricao_nbs' => $infNfse['xNBS'] ?? '',
+            'outras_informacoes' => $infNfse['xOutInf'] ?? '',
         ];
 
         // Dados do Prestador (emit no padrão nacional)
@@ -254,7 +257,14 @@ abstract class AbstractDanfse extends DaCommon
                 'numero' => $enderEmit['nro'] ?? '',
                 'complemento' => $enderEmit['xCpl'] ?? '',
                 'bairro' => $enderEmit['xBairro'] ?? '',
-                'municipio' => $enderEmit['xMun'] ?? '',
+                // `enderNac` NÃO traz xMun — só o código IBGE. O nome do
+                // município do emitente vem de xLocEmi, no topo da NFS-e; a UF
+                // sai da tabela IBGE quando o endereço não a informa.
+                'municipio' => $this->formatarMunicipio(
+                    $enderEmit['cMun'] ?? '',
+                    $enderEmit['xMun'] ?? $infNfse['xLocEmi'] ?? '',
+                    $enderEmit['UF'] ?? ''
+                ),
                 'codigo_municipio' => $enderEmit['cMun'] ?? '',
                 'uf' => $enderEmit['UF'] ?? '',
                 'cep' => $enderEmit['CEP'] ?? '',
@@ -278,7 +288,13 @@ abstract class AbstractDanfse extends DaCommon
                 'numero' => $endToma['nro'] ?? '',
                 'complemento' => $endToma['xCpl'] ?? '',
                 'bairro' => $endToma['xBairro'] ?? '',
-                'municipio' => $endNacToma['xMun'] ?? '',
+                // O tomador não tem nome de município em lugar algum do XML —
+                // só o código IBGE. Sem a tabela, este campo saía vazio.
+                'municipio' => $this->formatarMunicipio(
+                    $endNacToma['cMun'] ?? '',
+                    $endNacToma['xMun'] ?? '',
+                    $endNacToma['UF'] ?? ''
+                ),
                 'codigo_municipio' => $endNacToma['cMun'] ?? '',
                 'uf' => $endNacToma['UF'] ?? '',
                 'cep' => $endNacToma['CEP'] ?? '',
@@ -304,22 +320,40 @@ abstract class AbstractDanfse extends DaCommon
         $valorDescontoIncond = (float)($vServPrest['vDesc'] ?? 0);
         $valorDescontoCond = (float)($vServPrest['vDescCond'] ?? 0);
         
-        // ISS
-        $vISS = (float)($tribMun['vISSQN'] ?? 0);
-        $aliqISS = (float)($tribMun['pAliq'] ?? 0);
-        $vBC = (float)($tribMun['vBC'] ?? $valorServico - $valorDeducoes);
+        // Valores APURADOS pela SEFAZ. Ficam em infNFSe/valores — e é daqui que
+        // o DANFSe tem de ler. O DPS declara a intenção (tribISSQN, tpRetISSQN);
+        // quem calcula base, alíquota e imposto é o Fisco. Ler do DPS fazia
+        // "Alíquota Aplicada" e "ISSQN Apurado" saírem sempre zerados, porque
+        // `tribMun` do DPS não tem vBC, pAliq nem vISSQN.
+        $valoresNfse = $infNfse['valores'] ?? [];
+
+        $vISS    = (float)($valoresNfse['vISSQN'] ?? $tribMun['vISSQN'] ?? 0);
+        $aliqISS = (float)($valoresNfse['pAliqAplic'] ?? $tribMun['pAliq'] ?? 0);
+        $vBC     = (float)($valoresNfse['vBC'] ?? $tribMun['vBC'] ?? $valorServico - $valorDeducoes);
+
         $issRetido = (int)($tribMun['tpRetISSQN'] ?? 2);
         $tribISSQN = (int)($tribMun['tribISSQN'] ?? 1);
-        
-        // Outras retenções federais
-        $vPIS = (float)($tribFed['vPIS'] ?? 0);
-        $vCOFINS = (float)($tribFed['vCOFINS'] ?? 0);
-        $vINSS = (float)($tribFed['vINSS'] ?? 0);
-        $vIR = (float)($tribFed['vIR'] ?? 0);
-        $vCSLL = (float)($tribFed['vCSLL'] ?? 0);
-        
-        // Valor líquido (vem do nível superior infNFSe/valores)
-        $valoresNfse = $infNfse['valores'] ?? [];
+
+        // Retenções federais — os nomes do schema v1.01 são vPis/vCofins (dentro
+        // de `piscofins`) e vRetCP/vRetIRRF/vRetCSLL. Os nomes antigos (vPIS,
+        // vCOFINS, vINSS, vIR, vCSLL) não existem em lugar nenhum do XML, então
+        // toda a tributação federal saía zerada.
+        $pisCofins = $tribFed['piscofins'] ?? [];
+
+        $vPIS    = (float)($pisCofins['vPis'] ?? $tribFed['vPIS'] ?? 0);
+        $vCOFINS = (float)($pisCofins['vCofins'] ?? $tribFed['vCOFINS'] ?? 0);
+        $vINSS   = (float)($tribFed['vRetCP'] ?? $tribFed['vINSS'] ?? 0);
+        $vIR     = (float)($tribFed['vRetIRRF'] ?? $tribFed['vIR'] ?? 0);
+        $vCSLL   = (float)($tribFed['vRetCSLL'] ?? $tribFed['vCSLL'] ?? 0);
+
+        $retPisCofins = (int)($pisCofins['tpRetPisCofins'] ?? 2);
+
+        // Total apurado dos tributos (seção "Totais Aproximados" do oficial).
+        $totTrib     = $trib['totTrib'] ?? [];
+        $vTotTrib    = $totTrib['vTotTrib'] ?? [];
+        $totTribFed  = (float)($vTotTrib['vTotTribFed'] ?? 0);
+        $totTribEst  = (float)($vTotTrib['vTotTribEst'] ?? 0);
+        $totTribMun  = (float)($vTotTrib['vTotTribMun'] ?? 0);
 
         $vLiq = (float)($valoresNfse['vLiq'] ?? $valorServico);
         
@@ -329,9 +363,22 @@ abstract class AbstractDanfse extends DaCommon
         $this->servico = [
             'descricao' => $cServ['xDescServ'] ?? '',
             'codigo_tributacao_nacional' => $cServ['cTribNac'] ?? '',
+            // O XML autorizado traz a DESCRIÇÃO dos códigos (xTribNac/xTribMun);
+            // o oficial imprime "08.02.01 - 08.02 - Instrução, treinamento...".
+            'descricao_tributacao_nacional' => $infNfse['xTribNac'] ?? '',
+            'codigo_tributacao_municipal' => $cServ['cTribMun'] ?? '',
+            'descricao_tributacao_municipal' => $infNfse['xTribMun'] ?? '',
+            'codigo_nbs' => $cServ['cNBS'] ?? '',
+            'descricao_nbs' => $infNfse['xNBS'] ?? '',
             'codigo_interno' => $cServ['cIntContrib'] ?? '',
-            'local_prestacao' => $locPrest['cLocPrestacao'] ?? '',
-            'pais_prestacao' => $locPrest['cPais'] ?? '',
+            'local_prestacao' => $this->formatarMunicipio(
+                $locPrest['cLocPrestacao'] ?? '',
+                $infNfse['xLocPrestacao'] ?? ''
+            ),
+            'pais_prestacao' => $locPrest['cPaisPrestacao'] ?? $locPrest['cPais'] ?? '',
+            'pais_resultado' => $tribMun['cPaisResult'] ?? '',
+            'tipo_imunidade' => $tribMun['tpImunidade'] ?? '',
+            'regime_especial' => $regTrib['regEspTrib'] ?? '',
             'info_complementar' => $infoCompl['xInfComp'] ?? '',
             'valores' => [
                 'servicos' => $valorServico,
@@ -346,10 +393,14 @@ abstract class AbstractDanfse extends DaCommon
                 'inss' => $vINSS,
                 'ir' => $vIR,
                 'csll' => $vCSLL,
+                'ret_pis_cofins' => $retPisCofins,
                 'outras_retencoes' => 0,
                 'desconto_incondicionado' => $valorDescontoIncond,
                 'desconto_condicionado' => $valorDescontoCond,
                 'valor_liquido' => $vLiq,
+                'total_tributos_federais' => $totTribFed,
+                'total_tributos_estaduais' => $totTribEst,
+                'total_tributos_municipais' => $totTribMun,
             ],
         ];
     }
@@ -663,26 +714,38 @@ abstract class AbstractDanfse extends DaCommon
         $endereco = $this->montarEnderecoSimples($this->prestador['endereco'] ?? []);
         $this->pdf->cell($this->wPrint, 3, $endereco, 0, 1, 'L');
 
-        // Linha 4: Regime SN, Email, CEP, Município
+        // Linha 4: E-mail, Município, CEP — como no documento oficial.
         $y = $this->pdf->getY();
         $w4 = $this->wPrint / 4;
-        
+
         $this->pdf->setFont($this->fontePadrao, 'B', 7);
         $this->pdf->setXY($x, $y);
-        $this->pdf->cell($w2, 3, 'Regime de Apuracao Tributaria pelo SN', 0, 0, 'L');
-        $this->pdf->cell($w4, 3, 'E-mail', 0, 0, 'L');
-        $this->pdf->cell($w4/2, 3, 'CEP', 0, 0, 'L');
-        $this->pdf->cell($w4/2, 3, 'Municipio', 0, 1, 'L');
-        
+        $this->pdf->cell($w2, 3, 'E-mail', 0, 0, 'L');
+        $this->pdf->cell($w4, 3, 'Municipio', 0, 0, 'L');
+        $this->pdf->cell($w4, 3, 'CEP', 0, 1, 'L');
+
         $this->pdf->setFont($this->fontePadrao, '', 7);
         $this->pdf->setX($x);
-        $regimeSN = $this->getRegimeSimples($this->prestador['optante_simples'] ?? '');
-        $this->pdf->cell($w2, 3, $regimeSN, 0, 0, 'L');
-        $this->pdf->cell($w4, 3, mb_strtolower($this->prestador['email'] ?? ''), 0, 0, 'L');
-        $cep = $this->formatarCep($this->prestador['endereco']['cep'] ?? '');
-        $this->pdf->cell($w4/2, 3, $cep, 0, 0, 'L');
-        $municipio = $this->prestador['endereco']['municipio'] ?? '';
-        $this->pdf->cell($w4/2, 3, $municipio, 0, 1, 'L');
+        $this->pdf->cell($w2, 3, $this->ouTraco(mb_strtolower($this->prestador['email'] ?? '')), 0, 0, 'L');
+        $this->pdf->cell($w4, 3, $this->ouTraco($this->prestador['endereco']['municipio'] ?? ''), 0, 0, 'L');
+        $this->pdf->cell($w4, 3, $this->ouTraco($this->formatarCep($this->prestador['endereco']['cep'] ?? '')), 0, 1, 'L');
+
+        // Linha 5: os DOIS campos do Simples Nacional. São domínios distintos —
+        // opSimpNac (situação) e regApTribSN (regime de apuração) — e o oficial
+        // imprime os dois lado a lado.
+        $y = $this->pdf->getY();
+
+        $this->pdf->setFont($this->fontePadrao, 'B', 7);
+        $this->pdf->setXY($x, $y);
+        $this->pdf->cell($w2, 3, 'Simples Nacional na Data de Competencia', 0, 0, 'L');
+        $this->pdf->cell($w2, 3, 'Regime de Apuracao Tributaria pelo SN', 0, 1, 'L');
+
+        $this->pdf->setFont($this->fontePadrao, '', 6);
+        $this->pdf->setX($x);
+        $optante = $this->getOptanteSimplesNacional($this->prestador['optante_simples'] ?? '');
+        $this->pdf->cell($w2, 3, $this->ouTraco($optante), 0, 0, 'L');
+        $regimeSN = $this->getRegimeApuracaoSN($this->prestador['regime_tributacao'] ?? '');
+        $this->pdf->cell($w2, 3, $this->ouTraco($regimeSN), 0, 1, 'L');
 
         // Linha separadora
         $y = $this->pdf->getY() + 0.5;
@@ -795,14 +858,25 @@ abstract class AbstractDanfse extends DaCommon
         $this->pdf->cell($w4, 3, 'Local da Prestacao', 0, 0, 'L');
         $this->pdf->cell($w4, 3, 'Pais da Prestacao', 0, 1, 'L');
         
-        $this->pdf->setFont($this->fontePadrao, '', 7);
+        // O oficial imprime código E descrição ("08.02.01 - 08.02 - Instrução,
+        // treinamento..."); a descrição vem em xTribNac/xTribMun do XML
+        // autorizado e era simplesmente ignorada.
+        $this->pdf->setFont($this->fontePadrao, '', 6);
         $this->pdf->setX($x);
-        $this->pdf->cell($w4, 3, $this->servico['codigo_tributacao_nacional'] ?? '', 0, 0, 'L');
-        $this->pdf->cell($w4, 3, '', 0, 0, 'L'); // Código Municipal não disponível no XML
+        $this->pdf->cell($w4, 3, $this->ouTraco($this->codigoComDescricao(
+            $this->servico['codigo_tributacao_nacional'] ?? '',
+            $this->servico['descricao_tributacao_nacional'] ?? ''
+        )), 0, 0, 'L');
+        $this->pdf->cell($w4, 3, $this->ouTraco($this->codigoComDescricao(
+            $this->servico['codigo_tributacao_municipal'] ?? '',
+            $this->servico['descricao_tributacao_municipal'] ?? ''
+        )), 0, 0, 'L');
         $localPrest = $this->servico['local_prestacao'] ?? '';
-        if ($localPrest == '0000000') $localPrest = 'Aguas Maritimas';
-        $this->pdf->cell($w4, 3, $localPrest, 0, 0, 'L');
-        $this->pdf->cell($w4, 3, '', 0, 1, 'L');
+        if ('0000000' === $localPrest) {
+            $localPrest = 'Aguas Maritimas';
+        }
+        $this->pdf->cell($w4, 3, $this->ouTraco($localPrest), 0, 0, 'L');
+        $this->pdf->cell($w4, 3, $this->ouTraco($this->nomePais($this->servico['pais_prestacao'] ?? '')), 0, 1, 'L');
 
         // Linha 2: Descrição do Serviço
         $y = $this->pdf->getY();
@@ -835,11 +909,19 @@ abstract class AbstractDanfse extends DaCommon
         $this->pdf->setFont($this->fontePadrao, '', 6);
         $this->pdf->setX($x);
         $tipoTrib = $valores['tipo_tributacao'] ?? 1;
-        $tribTexto = $tipoTrib == 1 ? 'Operacao Tributavel' : 'Nao Tributavel';
+        $tribTexto = 1 == $tipoTrib ? 'Operacao Tributavel' : 'Nao Tributavel';
         $this->pdf->cell($w4, 2.5, $tribTexto, 0, 0, 'L');
-        $this->pdf->cell($w4, 2.5, 'Brasil', 0, 0, 'L');
-        $this->pdf->cell($w4, 2.5, $this->infNfse['local_incidencia'] ?? '', 0, 0, 'L');
-        $this->pdf->cell($w4, 2.5, 'Nenhum', 0, 1, 'L');
+        // Antes fixos em 'Brasil' e 'Nenhum', ignorando cPaisResult e regEspTrib
+        // que já vinham parseados.
+        $this->pdf->cell($w4, 2.5, $this->ouTraco($this->nomePais($this->servico['pais_resultado'] ?? '')), 0, 0, 'L');
+        $municipioIncid = $this->formatarMunicipio(
+            $this->infNfse['codigo_local_incidencia'] ?? '',
+            $this->infNfse['local_incidencia'] ?? ''
+        );
+        $this->pdf->cell($w4, 2.5, $this->ouTraco($municipioIncid), 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, $this->getRegimeEspecialTributacao(
+            $this->servico['regime_especial'] ?? '0'
+        ), 0, 1, 'L');
 
         // Segunda linha de tributação
         $y = $this->pdf->getY();
@@ -904,7 +986,10 @@ abstract class AbstractDanfse extends DaCommon
         $this->pdf->cell($w4, 3, 'R$ ' . $this->formatarValor($valores['base_calculo'] ?? 0), 0, 0, 'L');
         $aliquota = isset($valores['aliquota']) ? number_format($valores['aliquota'], 2, ',', '.') : '0,00';
         $this->pdf->cell($w4, 3, $aliquota . ' %', 0, 0, 'L');
-        $issRetido = ($valores['iss_retido'] ?? 2) == 1 ? 'Nao Retido' : 'Nao Retido';
+        // tpRetISSQN: 1 = Retido pelo tomador/intermediário, 2 = Não retido.
+        // Os dois ramos deste ternário eram idênticos ('Nao Retido'), então a
+        // retenção NUNCA aparecia no documento, ainda que declarada no XML.
+        $issRetido = 1 === (int) ($valores['iss_retido'] ?? 2) ? 'Retido' : 'Nao Retido';
         $this->pdf->cell($w4, 3, $issRetido, 0, 0, 'L');
         $this->pdf->cell($w4, 3, 'R$ ' . $this->formatarValor($valores['iss'] ?? 0), 0, 1, 'L');
 
@@ -949,7 +1034,9 @@ abstract class AbstractDanfse extends DaCommon
         $this->pdf->setX($x);
         $this->pdf->cell($w5, 3, 'R$ ' . $this->formatarValor($valores['pis'] ?? 0), 0, 0, 'L');
         $this->pdf->cell($w5, 3, 'R$ ' . $this->formatarValor($valores['cofins'] ?? 0), 0, 0, 'L');
-        $retPisCofins = (($valores['pis'] ?? 0) > 0 || ($valores['cofins'] ?? 0) > 0) ? 'Nao Retido' : 'Nao Retido';
+        // Idem ISSQN: os dois ramos eram 'Nao Retido'. A retenção é declarada em
+        // tpRetPisCofins (1 = retido), não inferida da existência de valor.
+        $retPisCofins = 1 === (int) ($valores['ret_pis_cofins'] ?? 2) ? 'Retido' : 'Nao Retido';
         $this->pdf->cell($w5, 3, $retPisCofins, 0, 0, 'L');
         $this->pdf->cell($w5 * 2, 3, 'R$ ' . $this->formatarValor($outrasRetencoes), 0, 1, 'L');
 
@@ -1110,18 +1197,116 @@ abstract class AbstractDanfse extends DaCommon
      * @param string $codigo
      * @return string
      */
-    private function getRegimeSimples($codigo)
+    /**
+     * Campo vazio vira "-", como no DANFSe oficial (que nunca deixa a célula em
+     * branco nem imprime "R$ 0,00" onde não há valor).
+     *
+     * @param string|null $valor
+     * @return string
+     */
+    private function ouTraco($valor)
+    {
+        $valor = trim((string) $valor);
+
+        return '' === $valor ? '-' : $valor;
+    }
+
+    /**
+     * Junta código e descrição no formato do oficial: "038 - 8599603 - Treinamento".
+     *
+     * @param string $codigo
+     * @param string $descricao
+     * @return string
+     */
+    private function codigoComDescricao($codigo, $descricao)
+    {
+        $codigo    = trim((string) $codigo);
+        $descricao = trim((string) $descricao);
+
+        if ('' === $descricao) {
+            return $codigo;
+        }
+
+        return '' === $codigo ? $descricao : $codigo . ' - ' . $descricao;
+    }
+
+    /**
+     * Nome do país a partir do código BACEN. Só o Brasil é resolvido: é o caso
+     * de mais de 99% das NFS-e e o XML omite o campo quando é nacional.
+     *
+     * @param string|int $codigo
+     * @return string
+     */
+    private function nomePais($codigo)
+    {
+        $codigo = trim((string) $codigo);
+
+        if ('' === $codigo) {
+            return '';
+        }
+
+        return '1058' === $codigo ? 'Brasil' : $codigo;
+    }
+
+    /**
+     * Situação perante o Simples Nacional na data da competência (opSimpNac).
+     *
+     * ATENÇÃO: este campo NÃO compartilha domínio com `regEspTrib`. Aplicar a
+     * tabela de regime especial aqui fazia uma ME/EPP (opSimpNac=3) ser impressa
+     * como "Sociedade de Profissionais" — classificação fiscal errada no
+     * documento. Os textos abaixo são os do DANFSe oficial.
+     *
+     * @param string|int $codigo
+     * @return string
+     */
+    private function getOptanteSimplesNacional($codigo)
+    {
+        $situacoes = [
+            '1' => 'Nao Optante',
+            '2' => 'Optante - Microempreendedor Individual (MEI)',
+            '3' => 'Optante - Microempresa ou Empresa de Pequeno Porte (ME/EPP)',
+        ];
+
+        return $situacoes[(string) $codigo] ?? '';
+    }
+
+    /**
+     * Regime de apuração dos tributos pelo Simples Nacional (regApTribSN).
+     *
+     * @param string|int $codigo
+     * @return string
+     */
+    private function getRegimeApuracaoSN($codigo)
     {
         $regimes = [
-            '1' => 'Microempresa Municipal',
-            '2' => 'Estimativa',
-            '3' => 'Sociedade de Profissionais',
-            '4' => 'Cooperativa',
-            '5' => 'Microempresario Individual (MEI)',
-            '6' => 'Microempresa ou Pequeno Porte (ME EPP)',
+            '1' => 'Regime de apuracao dos tributos federais e municipal pelo Simples Nacional',
+            '2' => 'Regime de apuracao dos tributos federais pelo Simples Nacional e o ISSQN por fora do Simples Nacional',
+            '3' => 'Regime de apuracao dos tributos federais e municipal por fora do Simples Nacional',
         ];
-        
-        return $regimes[$codigo] ?? 'Nao Optante';
+
+        return $regimes[(string) $codigo] ?? '';
+    }
+
+    /**
+     * Regime especial de tributação (regEspTrib) — domínio próprio, não confundir
+     * com o Simples Nacional acima.
+     *
+     * @param string|int $codigo
+     * @return string
+     */
+    private function getRegimeEspecialTributacao($codigo)
+    {
+        $regimes = [
+            '0' => 'Nenhum',
+            '1' => 'Ato Cooperado',
+            '2' => 'Estimativa',
+            '3' => 'Microempresa Municipal',
+            '4' => 'Notario ou Registrador',
+            '5' => 'Profissional Autonomo',
+            '6' => 'Sociedade de Profissionais',
+        ];
+
+        return $regimes[(string) $codigo] ?? 'Nenhum';
     }
 
     /**
@@ -1398,5 +1583,75 @@ abstract class AbstractDanfse extends DaCommon
         $chave = filter_var($this->infNfse['chave_acesso'] ?? '', FILTER_SANITIZE_NUMBER_INT);
 
         return 'https://www.nfse.gov.br/ConsultaPublica/?tpc=1&chave=' . $chave;
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Municípios
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * De-para IBGE carregado sob demanda (218KB — não custa nada quando o
+     * documento já traz o nome pronto).
+     *
+     * @var array<int, array{0: string, 1: string}>|null
+     */
+    private static $municipios = null;
+
+    /**
+     * Formata o município como o documento oficial: "Campinas - SP".
+     *
+     * O XML só traz `cMun` em `enderNac`/`endNac`; o nome, quando existe, vem
+     * solto em `xLocEmi`/`xLocPrestacao`/`xLocIncid`. Preferimos o nome do
+     * próprio documento e usamos a tabela IBGE para completar a UF — ou para
+     * resolver tudo, no caso do tomador, que não tem nome algum no XML.
+     *
+     * @param string|int $codigoIbge
+     * @param string     $nome Nome já conhecido (xLocEmi e afins), se houver
+     * @param string     $uf   UF já conhecida, se houver
+     * @return string
+     */
+    protected function formatarMunicipio($codigoIbge, $nome = '', $uf = '')
+    {
+        $codigo = (int) filter_var((string) $codigoIbge, FILTER_SANITIZE_NUMBER_INT);
+        $tabela = $this->municipioPorCodigo($codigo);
+
+        if ('' === (string) $nome && null !== $tabela) {
+            $nome = $tabela[0];
+        }
+
+        if ('' === (string) $uf && null !== $tabela) {
+            $uf = $tabela[1];
+        }
+
+        $nome = trim((string) $nome);
+        $uf   = trim((string) $uf);
+
+        if ('' === $nome) {
+            // Sem nome nem tabela, o código cru ainda é melhor que o vazio.
+            return $codigo > 0 ? (string) $codigo : '';
+        }
+
+        return '' === $uf ? $nome : $nome . ' - ' . $uf;
+    }
+
+    /**
+     * @param int $codigo
+     * @return array{0: string, 1: string}|null
+     */
+    private function municipioPorCodigo($codigo)
+    {
+        if ($codigo <= 0) {
+            return null;
+        }
+
+        if (null === self::$municipios) {
+            $arquivo = __DIR__ . '/../../storage/municipios.php';
+
+            self::$municipios = is_file($arquivo) ? (array) require $arquivo : [];
+        }
+
+        return self::$municipios[$codigo] ?? null;
     }
 }

@@ -96,6 +96,25 @@ abstract class AbstractDanfse extends DaCommon
     protected $ibsCbs = [];
 
     /**
+     * Dados do intermediário do serviço (opcional no leiaute)
+     * @var array
+     */
+    protected $intermediario = [];
+
+    /**
+     * Dados do órgão emissor exibidos no cabeçalho (opcional).
+     *
+     * O DANFSe oficial mostra "Prefeitura Municipal de X / Secretaria de
+     * Fazenda / telefone / e-mail" ao lado do brasão. Esses dados NÃO estão no
+     * XML — o portal os obtém de cadastro próprio por município. Quem tiver a
+     * informação pode fornecê-la por {@see setOrgaoEmissor()}; sem ela, o
+     * espaço fica livre em vez de exibir dado inventado.
+     *
+     * @var array
+     */
+    protected $orgaoEmissor = [];
+
+    /**
      * Construtor
      * 
      * @param string $xml Conteúdo XML da NFSe
@@ -164,6 +183,7 @@ abstract class AbstractDanfse extends DaCommon
         $this->tomador = $this->convertDataToPdfEncoding($this->tomador);
         $this->servico = $this->convertDataToPdfEncoding($this->servico);
         $this->ibsCbs = $this->convertDataToPdfEncoding($this->ibsCbs);
+        $this->intermediario = $this->convertDataToPdfEncoding($this->intermediario);
     }
 
     /**
@@ -416,6 +436,27 @@ abstract class AbstractDanfse extends DaCommon
             ],
         ];
 
+        // Intermediário do serviço — opcional no leiaute. A geração do grupo
+        // ainda não existe no Dps (TODO lá), mas o XML autorizado pode trazê-lo
+        // quando a nota veio de outro emissor, então o DANFSe precisa saber ler.
+        $interm     = $dps['interm'] ?? [];
+        $endInterm  = $interm['end'] ?? [];
+        $endNacInt  = $endInterm['endNac'] ?? [];
+
+        $this->intermediario = [] === $interm ? [] : [
+            'razao_social' => $interm['xNome'] ?? '',
+            'cnpj' => $interm['CNPJ'] ?? '',
+            'cpf' => $interm['CPF'] ?? '',
+            'inscricao_municipal' => $interm['IM'] ?? '',
+            'fone' => $interm['fone'] ?? '',
+            'email' => $interm['email'] ?? '',
+            'municipio' => $this->formatarMunicipio(
+                $endNacInt['cMun'] ?? '',
+                $endNacInt['xMun'] ?? '',
+                $endNacInt['UF'] ?? ''
+            ),
+        ];
+
         $this->parseIbsCbs($infNfse, $dps);
     }
 
@@ -589,9 +630,11 @@ abstract class AbstractDanfse extends DaCommon
         $this->renderCabecalho($logo);
         $this->renderPrestador();
         $this->renderTomador();
+        $this->renderIntermediario();
         $this->renderServico();
         $this->renderValores();
         $this->renderIbsCbs();
+        $this->renderTotaisAproximados();
         $this->renderRodape();
     }
 
@@ -620,6 +663,12 @@ abstract class AbstractDanfse extends DaCommon
         $this->pdf->setFont($this->fontePadrao, '', 10);
         $this->pdf->setXY($x + 35, $y + 9);
         $this->pdf->cell($this->wPrint - 70, 5, 'Documento Auxiliar da NFS-e', 0, 1, 'C');
+
+        // Órgão emissor (brasão + Prefeitura/Secretaria). Fica ABAIXO da faixa
+        // do título: as duas linhas centrais ocupam a largura toda e, colocado
+        // ao lado delas, o bloco se sobrepunha ao "Documento Auxiliar da NFS-e".
+        // Só aparece quando informado — o XML não traz esses dados.
+        $this->renderOrgaoEmissor($x + 36, $y + 16, $x + $this->wPrint - 46);
 
         // QR Code (quando a subclasse souber gerar) + o texto de autenticidade,
         // que o documento oficial traz sempre ao lado do código.
@@ -1255,6 +1304,205 @@ abstract class AbstractDanfse extends DaCommon
     }
 
     /**
+     * Define os dados do órgão emissor mostrados no cabeçalho.
+     *
+     * Uso:
+     * ```php
+     * (new Danfse($xml))
+     *     ->setOrgaoEmissor([
+     *         'nome'       => 'Prefeitura Municipal de Americana',
+     *         'secretaria' => 'Secretaria de Fazenda',
+     *         'fone'       => '(19)3475-9049',
+     *         'email'      => 'iss@americana.sp.gov.br',
+     *         'brasao'     => '/caminho/brasao.png', // opcional
+     *     ])
+     *     ->render();
+     * ```
+     *
+     * @param array $dados
+     * @return $this
+     */
+    public function setOrgaoEmissor(array $dados)
+    {
+        $this->orgaoEmissor = $dados;
+
+        return $this;
+    }
+
+    /**
+     * Desenha, no canto direito do cabeçalho, o brasão e os dados do órgão
+     * emissor — quando informados por {@see setOrgaoEmissor()}.
+     *
+     * @param float $x
+     * @param float $y
+     * @param float $limiteDireito Onde começa a área do QR Code
+     * @return void
+     */
+    private function renderOrgaoEmissor($x, $y, $limiteDireito)
+    {
+        if ([] === $this->orgaoEmissor) {
+            return;
+        }
+
+        $dados  = $this->convertDataToPdfEncoding($this->orgaoEmissor);
+        $brasao = $this->orgaoEmissor['brasao'] ?? '';
+        $textoX = $x;
+
+        if (is_string($brasao) && '' !== $brasao && is_file($brasao)) {
+            $dimensoes = @getimagesize($brasao);
+
+            if (false !== $dimensoes && (int) $dimensoes[1] > 0) {
+                $altura  = 10;
+                $largura = min(round($dimensoes[0] * ($altura / $dimensoes[1]), 0), 12);
+
+                try {
+                    $this->pdf->Image($brasao, $x, $y + 2, $largura, $altura);
+                    $textoX = $x + $largura + 1;
+                } catch (\Throwable $e) {
+                    // Segue sem o brasão.
+                }
+            }
+        }
+
+        $largura = max(10, $limiteDireito - $textoX - 1);
+
+        $this->pdf->setFont($this->fontePadrao, 'B', 6);
+        $this->pdf->setXY($textoX, $y + 2);
+        $this->pdf->cell($largura, 2.5, $dados['nome'] ?? '', 0, 1, 'L');
+
+        $this->pdf->setFont($this->fontePadrao, '', 5);
+
+        foreach (['secretaria', 'fone', 'email'] as $campo) {
+            if ('' === (string) ($dados[$campo] ?? '')) {
+                continue;
+            }
+
+            $this->pdf->setX($textoX);
+            $this->pdf->cell($largura, 2.2, $dados[$campo], 0, 1, 'L');
+        }
+    }
+
+    /**
+     * Intermediário do serviço.
+     *
+     * O documento oficial dedica uma faixa a este grupo mesmo quando ele não
+     * existe, com o dizer "INTERMEDIÁRIO DO SERVIÇO NÃO IDENTIFICADO NA NFS-e"
+     * — a ausência do intermediário é informação fiscal, não um vazio a omitir.
+     *
+     * @return void
+     */
+    private function renderIntermediario()
+    {
+        $y = $this->pdf->getY() + 1;
+        $x = $this->margesq;
+
+        if ([] === $this->intermediario) {
+            $this->pdf->setFont($this->fontePadrao, '', 7);
+            $this->pdf->setXY($x, $y);
+            $this->pdf->cell(
+                $this->wPrint,
+                4,
+                'INTERMEDIÁRIO DO SERVIÇO NÃO IDENTIFICADO NA NFS-e',
+                0,
+                1,
+                'C'
+            );
+
+            $y = $this->pdf->getY() + 0.5;
+            $this->pdf->line($x, $y, $x + $this->wPrint, $y);
+
+            return;
+        }
+
+        $w4 = $this->wPrint / 4;
+
+        $this->pdf->setFont($this->fontePadrao, 'B', 8);
+        $this->pdf->setXY($x, $y);
+        $this->pdf->cell($this->wPrint, 5, 'INTERMEDIÁRIO DO SERVIÇO', 1, 1, 'L', true);
+
+        $y = $this->pdf->getY();
+        $this->pdf->setFont($this->fontePadrao, 'B', 7);
+        $this->pdf->setXY($x, $y);
+        $this->pdf->cell($w4, 3, 'CNPJ / CPF / NIF', 0, 0, 'L');
+        $this->pdf->cell($w4, 3, 'Inscrição Municipal', 0, 0, 'L');
+        $this->pdf->cell($w4, 3, 'Telefone', 0, 0, 'L');
+        $this->pdf->cell($w4, 3, 'Município', 0, 1, 'L');
+
+        $this->pdf->setFont($this->fontePadrao, '', 7);
+        $this->pdf->setX($x);
+        $documento = '' !== ($this->intermediario['cnpj'] ?? '')
+            ? $this->intermediario['cnpj']
+            : ($this->intermediario['cpf'] ?? '');
+        $this->pdf->cell($w4, 3, $this->ouTraco($this->formatarCnpjCpf($documento)), 0, 0, 'L');
+        $this->pdf->cell($w4, 3, $this->ouTraco($this->intermediario['inscricao_municipal'] ?? ''), 0, 0, 'L');
+        $this->pdf->cell($w4, 3, $this->ouTraco($this->intermediario['fone'] ?? ''), 0, 0, 'L');
+        $this->pdf->cell($w4, 3, $this->ouTraco($this->intermediario['municipio'] ?? ''), 0, 1, 'L');
+
+        $y = $this->pdf->getY();
+        $this->pdf->setFont($this->fontePadrao, 'B', 7);
+        $this->pdf->setXY($x, $y);
+        $this->pdf->cell($this->wPrint, 3, 'Nome / Nome Empresarial', 0, 1, 'L');
+
+        $this->pdf->setFont($this->fontePadrao, '', 7);
+        $this->pdf->setX($x);
+        $this->pdf->cell($this->wPrint, 3, $this->ouTraco($this->intermediario['razao_social'] ?? ''), 0, 1, 'L');
+
+        $y = $this->pdf->getY() + 0.5;
+        $this->pdf->line($x, $y, $x + $this->wPrint, $y);
+    }
+
+    /**
+     * Totais aproximados dos tributos (Lei 12.741/2012 — "Lei da Transparência").
+     *
+     * Seção própria no documento oficial, com as três esferas lado a lado. Os
+     * valores vêm de `totTrib/vTotTrib` do DPS e já eram parseados; só não
+     * havia onde imprimi-los.
+     *
+     * @return void
+     */
+    private function renderTotaisAproximados()
+    {
+        $y = $this->pdf->getY() + 1;
+        $x = $this->margesq;
+
+        $valores = $this->servico['valores'] ?? [];
+        $w3      = $this->wPrint / 3;
+
+        $this->pdf->setFont($this->fontePadrao, 'B', 8);
+        $this->pdf->setXY($x, $y);
+        $this->pdf->cell($this->wPrint, 4, 'TOTAIS APROXIMADOS DOS TRIBUTOS', 1, 1, 'L', true);
+
+        $y = $this->pdf->getY();
+        $this->pdf->setFont($this->fontePadrao, 'B', 6);
+        $this->pdf->setXY($x, $y);
+        $this->pdf->cell($w3, 2.5, 'Federais', 0, 0, 'C');
+        $this->pdf->cell($w3, 2.5, 'Estaduais', 0, 0, 'C');
+        $this->pdf->cell($w3, 2.5, 'Municipais', 0, 1, 'C');
+
+        $this->pdf->setFont($this->fontePadrao, '', 6);
+        $this->pdf->setX($x);
+        $this->pdf->cell($w3, 2.5, $this->valorOuTraco($valores['total_tributos_federais'] ?? 0), 0, 0, 'C');
+        $this->pdf->cell($w3, 2.5, $this->valorOuTraco($valores['total_tributos_estaduais'] ?? 0), 0, 0, 'C');
+        $this->pdf->cell($w3, 2.5, $this->valorOuTraco($valores['total_tributos_municipais'] ?? 0), 0, 1, 'C');
+
+        // Linha separadora
+        $y = $this->pdf->getY() + 0.5;
+        $this->pdf->line($x, $y, $x + $this->wPrint, $y);
+    }
+
+    /**
+     * Valor zerado vira "-", como no oficial (que não polui o documento com
+     * "R$ 0,00" em campo sem tributo).
+     *
+     * @param float $valor
+     * @return string
+     */
+    private function valorOuTraco($valor)
+    {
+        return (float) $valor > 0 ? 'R$ ' . $this->formatarValor($valor) : '-';
+    }
+
+    /**
      * Percentual no formato do documento: "0,90 %".
      *
      * @param float $valor
@@ -1293,8 +1541,8 @@ abstract class AbstractDanfse extends DaCommon
         $this->pdf->setFont($this->fontePadrao, 'I', 7);
         $this->pdf->setXY($x, $y);
         
-        $textoRodape = 'Este documento e uma representacao grafica da NFSe e foi impresso apenas para facilitar a consulta. ' .
-                      'A NFSe pode ser consultada atraves do codigo de verificacao no site da prefeitura ou portal nacional.';
+        $textoRodape = 'Este documento é uma representação gráfica da NFS-e e foi impresso apenas para facilitar a consulta. ' .
+                      'A NFS-e pode ser consultada através do código de verificação no site da prefeitura ou portal nacional.';
         
         $this->pdf->multiCell($this->wPrint, 3, $textoRodape, 0, 'C');
 

@@ -264,6 +264,73 @@ final class DanfseTest extends TestCase
 
     /*
     |--------------------------------------------------------------------------
+    | Seções que o documento oficial traz
+    |--------------------------------------------------------------------------
+    */
+
+    #[Test]
+    public function declaraQueNaoHaIntermediarioQuandoANotaNaoTem(): void
+    {
+        $texto = $this->normaliza($this->texto('nfse_autorizada_americana_sem_ibscbs.xml'));
+
+        // O oficial dedica uma faixa ao grupo mesmo quando ele não existe: a
+        // ausência do intermediário é informação fiscal, não um vazio a omitir.
+        $this->assertStringContainsString(
+            'INTERMEDIÁRIO DO SERVIÇO NÃO IDENTIFICADO NA NFS-e',
+            $texto,
+        );
+    }
+
+    #[Test]
+    public function imprimeASecaoDeTotaisAproximadosDosTributos(): void
+    {
+        $texto = $this->normaliza($this->texto('nfse_autorizada_americana_sem_ibscbs.xml'));
+
+        // Lei 12.741/2012 — o oficial traz as três esferas lado a lado.
+        $this->assertStringContainsString('TOTAIS APROXIMADOS DOS TRIBUTOS', $texto);
+        $this->assertStringContainsString('Federais', $texto);
+        $this->assertStringContainsString('Estaduais', $texto);
+        $this->assertStringContainsString('Municipais', $texto);
+    }
+
+    #[Test]
+    public function mostraOOrgaoEmissorNoCabecalhoQuandoInformado(): void
+    {
+        // Estes dados NÃO vêm no XML — o portal os tem em cadastro próprio.
+        // Quem os tiver informa por setOrgaoEmissor(); sem isso o espaço fica
+        // livre, em vez de exibir dado inventado.
+        $xml = file_get_contents(__DIR__ . '/Fixtures/nfse_autorizada_americana_sem_ibscbs.xml');
+
+        $nivel = error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
+
+        try {
+            $pdf = (new DanfseSimples($xml))
+                ->setOrgaoEmissor([
+                    'nome'       => 'Prefeitura Municipal de Americana',
+                    'secretaria' => 'Secretaria de Fazenda',
+                    'fone'       => '(19)3475-9049',
+                    'email'      => 'iss@americana.sp.gov.br',
+                ])
+                ->render();
+        } finally {
+            error_reporting($nivel);
+        }
+
+        $arquivo = tempnam(sys_get_temp_dir(), 'danfse_') . '.pdf';
+        file_put_contents($arquivo, $pdf);
+
+        try {
+            $texto = $this->normaliza((new Parser())->parseFile($arquivo)->getText());
+        } finally {
+            @unlink($arquivo);
+        }
+
+        $this->assertStringContainsString('Prefeitura Municipal de Americana', $texto);
+        $this->assertStringContainsString('Secretaria de Fazenda', $texto);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Helpers
     |--------------------------------------------------------------------------
     */

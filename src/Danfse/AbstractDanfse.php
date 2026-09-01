@@ -85,6 +85,12 @@ abstract class AbstractDanfse extends DaCommon
     protected $servico = [];
 
     /**
+     * Grupo IBS/CBS da Reforma Tributária (EC 132/2023)
+     * @var array
+     */
+    protected $ibsCbs = [];
+
+    /**
      * Construtor
      * 
      * @param string $xml Conteúdo XML da NFSe
@@ -152,6 +158,7 @@ abstract class AbstractDanfse extends DaCommon
         $this->prestador = $this->convertDataToPdfEncoding($this->prestador);
         $this->tomador = $this->convertDataToPdfEncoding($this->tomador);
         $this->servico = $this->convertDataToPdfEncoding($this->servico);
+        $this->ibsCbs = $this->convertDataToPdfEncoding($this->ibsCbs);
     }
 
     /**
@@ -403,6 +410,62 @@ abstract class AbstractDanfse extends DaCommon
                 'total_tributos_municipais' => $totTribMun,
             ],
         ];
+
+        $this->parseIbsCbs($infNfse, $dps);
+    }
+
+    /**
+     * Grupo IBS/CBS — Reforma Tributária (EC 132/2023).
+     *
+     * ATENÇÃO: existem DOIS grupos `<IBSCBS>` no XML autorizado, e eles têm
+     * conteúdos diferentes:
+     *
+     *  - `infNFSe/IBSCBS`        → o que o Fisco CALCULOU (alíquotas e valores)
+     *  - `infNFSe/DPS/infDPS/IBSCBS` → o que o contribuinte DECLAROU (CST,
+     *                                  cClassTrib, finalidade)
+     *
+     * Ler o do DPS achando que são os valores devolve tudo zerado — foi
+     * exatamente esse tipo de troca que zerava o ISSQN antes.
+     *
+     * Obrigatório a partir de 01/08/2026 (Dps::IBSCBS_OBRIGATORIO_EM) e, para
+     * o Simples Nacional, 01/01/2027.
+     *
+     * @param array $infNfse
+     * @param array $dps
+     * @return void
+     */
+    private function parseIbsCbs(array $infNfse, array $dps)
+    {
+        // Lado NFS-e: valores apurados.
+        $grupo    = $infNfse['IBSCBS'] ?? [];
+        $valores  = $grupo['valores'] ?? [];
+        $totCIBS  = $grupo['totCIBS'] ?? [];
+        $gIBS     = $totCIBS['gIBS'] ?? [];
+        $gCBS     = $totCIBS['gCBS'] ?? [];
+
+        // Lado DPS: o que foi declarado (CST/cClassTrib).
+        $gIBSCBS = $dps['IBSCBS']['valores']['trib']['gIBSCBS'] ?? [];
+
+        $this->ibsCbs = [
+            'presente' => [] !== $grupo,
+            'localidade_incidencia' => $this->formatarMunicipio(
+                $grupo['cLocalidadeIncid'] ?? '',
+                $grupo['xLocalidadeIncid'] ?? ''
+            ),
+            'cst' => $gIBSCBS['CST'] ?? '',
+            'classificacao_tributaria' => $gIBSCBS['cClassTrib'] ?? '',
+            'base_calculo' => (float)($valores['vBC'] ?? 0),
+            'aliquota_ibs_uf' => (float)($valores['uf']['pIBSUF'] ?? 0),
+            'aliquota_ibs_mun' => (float)($valores['mun']['pIBSMun'] ?? 0),
+            'aliquota_cbs' => (float)($valores['fed']['pCBS'] ?? 0),
+            'valor_ibs_uf' => (float)($gIBS['gIBSUFTot']['vIBSUF'] ?? 0),
+            'valor_ibs_mun' => (float)($gIBS['gIBSMunTot']['vIBSMun'] ?? 0),
+            'valor_ibs' => (float)($gIBS['vIBSTot'] ?? 0),
+            'valor_cbs' => (float)($gCBS['vCBS'] ?? 0),
+            // vTotNF é o total da nota já com IBS/CBS. Em 2026 (ano de teste)
+            // equivale a vLiq; a partir de 2027 passa a ser vLiq + vCBS + vIBS.
+            'valor_total' => (float)($totCIBS['vTotNF'] ?? 0),
+        ];
     }
 
     /**
@@ -522,6 +585,7 @@ abstract class AbstractDanfse extends DaCommon
         $this->renderTomador();
         $this->renderServico();
         $this->renderValores();
+        $this->renderIbsCbs();
         $this->renderRodape();
     }
 
@@ -1096,8 +1160,104 @@ abstract class AbstractDanfse extends DaCommon
     }
 
     /**
+     * Renderiza o quadro IBS/CBS — Reforma Tributária (EC 132/2023).
+     *
+     * O bloco é SEMPRE exibido, com zeros quando a nota não traz o grupo: a
+     * ausência do tributo é informação fiscal tanto quanto sua presença, e a
+     * partir de 01/08/2026 o grupo passa a ser obrigatório (01/01/2027 para o
+     * Simples Nacional).
+     *
+     * @return void
+     */
+    private function renderIbsCbs()
+    {
+        $y = $this->pdf->getY() + 1;
+        $x = $this->margesq;
+
+        $ibs = $this->ibsCbs;
+        $w4  = $this->wPrint / 4;
+
+        // Título da seção
+        $this->pdf->setFont($this->fontePadrao, 'B', 8);
+        $this->pdf->setXY($x, $y);
+        $this->pdf->cell($this->wPrint, 5, 'TRIBUTACAO IBS / CBS (REFORMA TRIBUTARIA)', 1, 1, 'L', true);
+
+        // Situação tributária e localidade de incidência
+        $y = $this->pdf->getY();
+        $this->pdf->setFont($this->fontePadrao, 'B', 6);
+        $this->pdf->setXY($x, $y);
+        $this->pdf->cell($w4, 2.5, 'CST', 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, 'Classificacao Tributaria', 0, 0, 'L');
+        $this->pdf->cell($w4 * 2, 2.5, 'Municipio de Incidencia do IBS/CBS', 0, 1, 'L');
+
+        $this->pdf->setFont($this->fontePadrao, '', 6);
+        $this->pdf->setX($x);
+        $this->pdf->cell($w4, 2.5, $this->ouTraco($ibs['cst'] ?? ''), 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, $this->ouTraco($ibs['classificacao_tributaria'] ?? ''), 0, 0, 'L');
+        $this->pdf->cell($w4 * 2, 2.5, $this->ouTraco($ibs['localidade_incidencia'] ?? ''), 0, 1, 'L');
+
+        // Base de cálculo e alíquotas
+        $y = $this->pdf->getY();
+        $this->pdf->setFont($this->fontePadrao, 'B', 6);
+        $this->pdf->setXY($x, $y);
+        $this->pdf->cell($w4, 2.5, 'Base de Calculo IBS/CBS', 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, 'Aliquota IBS Estadual', 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, 'Aliquota IBS Municipal', 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, 'Aliquota CBS', 0, 1, 'L');
+
+        $this->pdf->setFont($this->fontePadrao, '', 6);
+        $this->pdf->setX($x);
+        $this->pdf->cell($w4, 2.5, 'R$ ' . $this->formatarValor($ibs['base_calculo'] ?? 0), 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, $this->formatarPercentual($ibs['aliquota_ibs_uf'] ?? 0), 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, $this->formatarPercentual($ibs['aliquota_ibs_mun'] ?? 0), 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, $this->formatarPercentual($ibs['aliquota_cbs'] ?? 0), 0, 1, 'L');
+
+        // Valores apurados
+        $y = $this->pdf->getY();
+        $this->pdf->setFont($this->fontePadrao, 'B', 6);
+        $this->pdf->setXY($x, $y);
+        $this->pdf->cell($w4, 2.5, 'Valor IBS Estadual', 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, 'Valor IBS Municipal', 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, 'Valor Total do IBS', 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, 'Valor da CBS', 0, 1, 'L');
+
+        $this->pdf->setFont($this->fontePadrao, '', 6);
+        $this->pdf->setX($x);
+        $this->pdf->cell($w4, 2.5, 'R$ ' . $this->formatarValor($ibs['valor_ibs_uf'] ?? 0), 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, 'R$ ' . $this->formatarValor($ibs['valor_ibs_mun'] ?? 0), 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, 'R$ ' . $this->formatarValor($ibs['valor_ibs'] ?? 0), 0, 0, 'L');
+        $this->pdf->cell($w4, 2.5, 'R$ ' . $this->formatarValor($ibs['valor_cbs'] ?? 0), 0, 1, 'L');
+
+        // Total da nota com IBS/CBS — só faz sentido quando o Fisco o devolveu.
+        if (($ibs['valor_total'] ?? 0) > 0) {
+            $y  = $this->pdf->getY() + 0.5;
+            $w2 = $this->wPrint / 2;
+
+            $this->pdf->setFont($this->fontePadrao, 'B', 8);
+            $this->pdf->setXY($x, $y);
+            $this->pdf->cell($w2, 5, 'Valor Total da NFS-e com IBS/CBS', 1, 0, 'L', true);
+            $this->pdf->cell($w2, 5, 'R$ ' . $this->formatarValor($ibs['valor_total']), 1, 1, 'R', true);
+        }
+
+        // Linha separadora
+        $y = $this->pdf->getY() + 0.5;
+        $this->pdf->line($x, $y, $x + $this->wPrint, $y);
+    }
+
+    /**
+     * Percentual no formato do documento: "0,90 %".
+     *
+     * @param float $valor
+     * @return string
+     */
+    private function formatarPercentual($valor)
+    {
+        return number_format((float) $valor, 2, ',', '.') . ' %';
+    }
+
+    /**
      * Renderiza rodapé
-     * 
+     *
      * @return void
      */
     private function renderRodape()

@@ -1546,13 +1546,24 @@ abstract class AbstractDanfse extends DaCommon
         
         $this->pdf->multiCell($this->wPrint, 3, $textoRodape, 0, 'C');
 
-        // Adiciona créditos se configurado
+        // Adiciona créditos se configurado.
+        //
+        // A atribuição ao NFePHP permanece porque o motor de PDF vem mesmo do
+        // sped-da (LGPL/MIT) — retirá-la seria incorreto. O que muda é que o
+        // crédito de quem gerou o documento passa a ser desta biblioteca.
         if ($this->powered) {
             $y = $this->pdf->getY() + 1;
             $this->pdf->setFont($this->fontePadrao, '', 6);
             $this->pdf->setXY($x, $y);
             $credito = !empty($this->creditos) ? $this->creditos . ' - ' : '';
-            $this->pdf->cell($this->wPrint, 3, $credito . 'Powered by NFePHP', 0, 1, 'C');
+            $this->pdf->cell(
+                $this->wPrint,
+                3,
+                $credito . 'Powered by Quantum Tecnologia - NFS-e Nacional (sobre NFePHP)',
+                0,
+                1,
+                'C'
+            );
         }
     }
     

@@ -862,6 +862,17 @@ abstract class AbstractDanfse extends DaCommon
     }
 
     /**
+     * Resolve um código IBGE em "Município - UF" para os layouts.
+     *
+     * @param string $codigoIbge
+     * @return string
+     */
+    public function formatarMunicipioNoLayout($codigoIbge)
+    {
+        return $this->formatarMunicipio($codigoIbge);
+    }
+
+    /**
      * Formata data para os layouts.
      *
      * @param string $valor

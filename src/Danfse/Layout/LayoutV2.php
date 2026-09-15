@@ -143,8 +143,7 @@ class LayoutV2 implements LayoutDanfseInterface
      * diz que "a disposição de campos deve obrigatoriamente obedecer ao
      * disposto no respectivo anexo".
      *
-     * @param AbstractDanfse $danfse
-     * @param string|null    $logo
+     * @param string|null $logo
      *
      * @return void
      */
@@ -249,7 +248,7 @@ class LayoutV2 implements LayoutDanfseInterface
             $this->mm(self::LARGURA_COL) - 1.2,
             3,
             $this->trunca(
-                $this->juntaTexto('Município: ', $this->ouTraco($infNfse['local_emissao'] ?? '')),
+                $this->juntaTexto('Município: ', $this->municipioDoEmitente()),
                 $this->mm(self::LARGURA_COL) - 1.6,
                 '',
                 self::FONTE_MUNICIPIO
@@ -1267,6 +1266,35 @@ class LayoutV2 implements LayoutDanfseInterface
     | coluna "Outros Campos / Observações"). Imprimir o código cru deixaria o
     | documento ilegível para quem o recebe.
     */
+
+    /**
+     * Município do emitente para o cabeçalho, no formato "Município / UF".
+     *
+     * `xLocEmi` só existe no leiaute NACIONAL. Num XML ABRASF o campo não vem,
+     * e sem o fallback pela tabela do IBGE o cabeçalho exibiria o código cru
+     * ("Município: 3501608") — que não diz nada a quem recebe a nota.
+     *
+     * @return string
+     */
+    private function municipioDoEmitente()
+    {
+        $infNfse = $this->dados['infNfse'];
+
+        $nome = trim((string) ($infNfse['local_emissao'] ?? ''));
+
+        // Nome já resolvido: nada a fazer.
+        if ('' !== $nome && !ctype_digit($nome)) {
+            return $nome;
+        }
+
+        $codigo = '' !== $nome
+            ? $nome
+            : (string) ($this->dados['prestador']['endereco']['codigo_municipio'] ?? '');
+
+        $resolvido = $this->danfse->formatarMunicipioNoLayout($codigo);
+
+        return $this->ouTraco('' !== $resolvido ? $resolvido : $nome);
+    }
 
     /**
      * Chave de acesso sem o prefixo "NFS" (item 2.4.5).

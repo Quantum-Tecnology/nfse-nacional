@@ -25,8 +25,7 @@ class LayoutV1 implements LayoutDanfseInterface
     /**
      * Desenha o documento no layout histórico.
      *
-     * @param AbstractDanfse $danfse
-     * @param string|null    $logo
+     * @param string|null $logo
      *
      * @return void
      */

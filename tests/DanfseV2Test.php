@@ -244,6 +244,20 @@ final class DanfseV2Test extends TestCase
     }
 
     #[Test]
+    public function resolveOCodigoIbgeNoCabecalhoQuandoNaoHaNomeDoMunicipio(): void
+    {
+        // `xLocEmi` só existe no leiaute NACIONAL. Em XML ABRASF ele não vem, e
+        // o cabeçalho saía como "Município: 3501608" — código cru, que não diz
+        // nada a quem recebe a nota. A tabela do IBGE já vem no pacote.
+        $danfse = new DanfseSimples($this->xml('nfse_autorizada_americana_sem_ibscbs.xml'));
+
+        $this->assertStringContainsString(
+            'Americana',
+            $danfse->formatarMunicipioNoLayout('3501608'),
+        );
+    }
+
+    #[Test]
     public function informaOAmbienteGeradorEOTipoDeAmbiente(): void
     {
         // São campos distintos no modelo (item 2.4.5): ambGer diz QUEM gerou;

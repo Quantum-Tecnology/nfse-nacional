@@ -8,6 +8,12 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o 
 
 > **Nota sobre o histórico.** Este arquivo começa na `3.3.0`. As versões anteriores (24 tags, de `1.0.0` a `3.2.4`) não tinham changelog escrito e não serão reconstruídas a partir do log do Git.
 
+## [3.4.1] — 2026-09-14
+
+### Corrigido
+
+- **Cabeçalho do v2.0 exibia o código IBGE cru em nota ABRASF.** O campo `xLocEmi` só existe no leiaute NACIONAL; num XML ABRASF ele não vem, e o cabeçalho saía como `Município: 3501608` — que não diz nada a quem recebe a nota. Agora o código é resolvido pela tabela do IBGE já embarcada no pacote (`Município: Americana - SP`), com o código cru mantido apenas quando o município não está na tabela.
+
 ## [3.4.0] — 2026-09-14
 
 DANFSe no modelo oficial da **NT SE/CGNFS-e nº 008 v1.02** (14/07/2026), com a versão do layout selecionável.

@@ -56,6 +56,14 @@ class LayoutV2 implements LayoutDanfseInterface
     public const ALTURA_TITULO = 0.45;
 
     /**
+     * Altura da faixa de um bloco suprimido (notas 2, 3 e 4 do item 2.4.5).
+     *
+     * A NT fixa o mínimo em 0,32cm; usamos 0,45 — a mesma altura de um título
+     * de bloco — para o texto não ficar espremido contra as divisórias.
+     */
+    public const ALTURA_SUPRIMIDO = 0.45;
+
+    /**
      * Y de cada bloco conforme o item 2.4.5 (cm, a partir da margem superior).
      *
      * São os valores da NT. O desenho aplica o deslocamento acumulado por cima
@@ -168,21 +176,28 @@ class LayoutV2 implements LayoutDanfseInterface
 
         // O espaço liberado pelos blocos suprimidos acima é devolvido à
         // descrição do serviço — o campo de conteúdo livre, que é o que mais
-        // sofre com truncagem. Mas só até o ponto em que a descrição realmente
-        // precisa: devolver tudo abriria um vão no meio da página, e a NT manda
-        // que a sobra fique nas informações complementares (item 2.5.3).
-        $this->folgaParaServico = min(
+        // sofre com truncagem. Mas só o que ela precisa: devolver tudo abriria
+        // um vão no meio da página, e a NT manda que a sobra fique nas
+        // informações complementares (item 2.5.3).
+        //
+        // O teto é o espaço efetivamente liberado: pedir mais que isso empurraria
+        // o resto do documento para fora da página única exigida pelo item 2.2.
+        $this->folgaParaServico = max(0.0, min(
             -$this->deslocamento,
             $this->folgaQueADescricaoAproveita()
-        );
+        ));
 
-        // O bloco de serviço sobe com o deslocamento das supressões (fechando o
-        // vão que sobraria acima dele); a descrição fica com a folga reservada,
-        // e a partir do ISSQN tudo volta às coordenadas da NT.
-        $this->deslocamento += $this->folgaParaServico;
+        // O bloco de serviço sobe com todo o deslocamento das supressões,
+        // fechando o vão que sobraria acima dele.
         $this->desenhaServico();
 
-        $this->deslocamento = 0.0;
+        // Os blocos seguintes sobem junto, MENOS a folga reservada à descrição:
+        // é essa diferença que abre espaço para o texto entre a descrição e o
+        // ISSQN. Somar a folga ao deslocamento (movendo os dois) não adiantava —
+        // a distância entre eles ficava igual. O que sobra desce para o fim da
+        // página, com as informações complementares (item 2.5.3).
+        $this->deslocamento += $this->folgaParaServico;
+
         $this->desenhaIssqn();
         $this->desenhaTributacaoFederal();
         $this->desenhaIbsCbs();
@@ -211,16 +226,30 @@ class LayoutV2 implements LayoutDanfseInterface
         $infNfse = $this->dados['infNfse'];
         $y       = self::Y['cabecalho'];
 
-        // Moldura do cabeçalho, com fundo cinza 5% (item 2.2.3).
+        // Fundo cinza 5% do cabeçalho (item 2.2.3), pintado À DIREITA da
+        // logomarca. O FPDF não suporta PNG com transparência, então a marca é
+        // uma imagem de fundo branco: pintar o cinza sob ela deixaria um
+        // retângulo branco visível em volta. A faixa da logo fica branca, como
+        // no modelo do Anexo I.
+        $inicioDoCinza = 4.60; // fim da caixa da logomarca (0,49 + 4,00) + folga
+
         $this->pdf->setFillColor(self::CINZA_5, self::CINZA_5, self::CINZA_5);
+        $this->pdf->rect(
+            $this->mm($inicioDoCinza),
+            $this->mm($y),
+            $this->mm(self::X0 + self::LARGURA_TOTAL - $inicioDoCinza),
+            $this->mm(1.16),
+            'F'
+        );
+        $this->pdf->setFillColor(255, 255, 255);
+
+        // Moldura do cabeçalho, por cima do preenchimento.
         $this->pdf->rect(
             $this->mm(self::X0),
             $this->mm($y),
             $this->mm(self::LARGURA_TOTAL),
-            $this->mm(1.16),
-            'DF'
+            $this->mm(1.16)
         );
-        $this->pdf->setFillColor(255, 255, 255);
 
         // Logomarca da NFS-e — 0,85 × 4,00 @ 0,49/0,44.
         $this->danfse->desenhaMarcaNoLayout($this->mm(0.49), $this->mm(0.44), $this->mm(4.00), $this->mm(0.85), $logo);
@@ -298,18 +327,17 @@ class LayoutV2 implements LayoutDanfseInterface
             $this->pdf->getStringWidth($this->paraFonte($descricao)) / $larguraMm
         ));
 
-        $inicio = self::Y['servico'] + 1.33;
+        // Altura que a descrição precisa, em cm, com uma linha de respiro antes
+        // do bloco seguinte. Como os blocos abaixo sobem com o mesmo
+        // deslocamento deste, o espaço entre a descrição e o ISSQN é EXATAMENTE
+        // esta reserva — não sobra nem falta.
+        $necessario = (($linhas + 1) * 2.8) / 10;
 
-        // Quantas já cabem sem folga alguma — pelo MESMO cálculo que o desenho
-        // usa, senão a folga fica descolada do que a página realmente comporta.
-        $cabem = $this->linhasCabemAte($inicio, self::Y['issqn']);
+        // Espaço que o bloco já tem pelas coordenadas da NT (1,33 é o offset da
+        // descrição dentro do bloco de serviço).
+        $disponivel = self::Y['issqn'] - (self::Y['servico'] + 1.33);
 
-        if ($linhas <= $cabem) {
-            return 0.0;
-        }
-
-        // Converte as linhas que faltam em centímetros de folga.
-        return (($linhas - $cabem) * 2.8) / 10;
+        return max(0.0, $necessario - $disponivel);
     }
 
     /**
@@ -618,10 +646,10 @@ class LayoutV2 implements LayoutDanfseInterface
             self::X0,
             $inicio,
             self::LARGURA_TOTAL,
-            // Limite é o Y REAL do ISSQN (coordenada da NT, sem deslocamento):
-            // o bloco de serviço sobe, mas o ISSQN não — usar o Y deslocado
-            // encolheria o espaço e a descrição sumiria.
-            $this->linhasCabemAte($inicio, self::Y['issqn']),
+            // O ISSQN é desenhado com a folga reservada SOMADA ao deslocamento
+            // (ver desenha()), então o limite real da descrição é o Y deslocado
+            // mais essa folga — é justamente o espaço aberto para ela.
+            $this->linhasCabemAte($inicio, $this->y('issqn') + $this->folgaParaServico),
             2.8
         );
     }
@@ -822,10 +850,13 @@ class LayoutV2 implements LayoutDanfseInterface
      */
     private function suprimeBloco($frase, $bloco, $alturaCheia)
     {
-        $this->faixaTexto($frase, $this->y($bloco));
+        $this->faixaTexto($frase, $this->y($bloco), self::ALTURA_SUPRIMIDO);
 
-        // O bloco ocuparia $alturaCheia + a faixa de título; passa a ocupar 0,32.
-        $this->deslocamento -= ($alturaCheia + self::ALTURA_TITULO) - 0.32;
+        // O bloco ocuparia $alturaCheia + a faixa de título; passa a ocupar a
+        // altura mínima da nota 2. O desconto usa EXATAMENTE a mesma altura que
+        // foi desenhada: qualquer diferença entre as duas vira faixa em branco
+        // (ou sobreposição) entre este bloco e o seguinte.
+        $this->deslocamento -= ($alturaCheia + self::ALTURA_TITULO) - self::ALTURA_SUPRIMIDO;
     }
 
     /*
@@ -882,14 +913,16 @@ class LayoutV2 implements LayoutDanfseInterface
     {
         $larguraMm = $this->mm($largura);
 
-        // Grade do bloco: divisórias entre as quatro colunas (item 2.2.3).
+        // Grade do bloco: divisórias entre as colunas (item 2.2.3).
         //
-        // Só a divisória de X1 desce o bloco inteiro. As de X2 e X3 são
-        // desenhadas linha a linha por quem conhece o bloco ({@see colunas()}),
-        // porque campos de coluna dupla ocupam duas colunas e uma divisória em
-        // cima deles cortaria o texto ao meio.
+        // Apenas a FAIXA DO TÍTULO recebe a divisória de X1 descendo inteira —
+        // ali as quatro colunas sempre existem. Nas linhas seguintes cada bloco
+        // desenha as suas ({@see divisoriasDaLinha}), porque campos de coluna
+        // dupla (Nome, Endereço, E-mail) atravessam X1 e X2: uma divisória
+        // descendo o bloco todo cortaria o texto ao meio e invadiria a coluna
+        // vizinha visualmente.
         if ($alturaBloco > 0) {
-            $this->divisoriasVerticais($y, $alturaBloco, [self::X1]);
+            $this->divisoriasVerticais($y, min($alturaBloco, self::ALTURA_CAMPO), [self::X1]);
         }
 
         $this->pdf->setFillColor(self::CINZA_5, self::CINZA_5, self::CINZA_5);
@@ -1010,9 +1043,20 @@ class LayoutV2 implements LayoutDanfseInterface
      */
     private function faixaTexto($texto, $y, $altura = 0.32)
     {
+        $alturaMm = $this->mm($altura);
+
         $this->pdf->setFont($this->fonte, 'B', self::FONTE_TITULO_BLOCO);
         $this->pdf->setXY($this->mm(self::X0), $this->mm($y));
-        $this->pdf->cell($this->mm(self::LARGURA_TOTAL), $this->mm($altura), $texto, 1, 0, 'L');
+        $this->pdf->cell($this->mm(self::LARGURA_TOTAL), $alturaMm, $texto, 0, 0, 'L');
+
+        // Só as linhas de topo e base, sem as laterais: a borda da página já
+        // fecha os lados, e `cell(..., 1, ...)` desenharia um retângulo isolado
+        // no meio do formulário.
+        $x1 = $this->mm(self::X0);
+        $x2 = $this->mm(self::X0 + self::LARGURA_TOTAL);
+
+        $this->pdf->line($x1, $this->mm($y), $x2, $this->mm($y));
+        $this->pdf->line($x1, $this->mm($y) + $alturaMm, $x2, $this->mm($y) + $alturaMm);
     }
 
     /**

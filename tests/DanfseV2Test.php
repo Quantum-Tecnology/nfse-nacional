@@ -244,6 +244,32 @@ final class DanfseV2Test extends TestCase
     }
 
     #[Test]
+    public function distribuiALogomarcaOficialQueOFpdfConsegueDesenhar(): void
+    {
+        // O código procura a logo em imgs/nfse_logo.png desde a 3.3, mas o
+        // arquivo não existia — e o cabeçalho caía no desenho em texto.
+        $logo = __DIR__ . '/../imgs/nfse_logo.png';
+
+        $this->assertFileExists($logo, 'A logomarca oficial da NFS-e deve vir no pacote.');
+
+        // O FPDF lança "Alpha channel not supported" em PNG com transparência, e
+        // o renderizador engole a exceção caindo no texto — sem erro nenhum para
+        // investigar. Este teste é o que denuncia a troca por uma imagem com alfa.
+        $info = getimagesize($logo);
+
+        $this->assertIsArray($info);
+        $this->assertSame(IMAGETYPE_PNG, $info[2]);
+
+        $canal = ord(file_get_contents($logo, false, null, 25, 1));
+
+        $this->assertNotContains(
+            $canal,
+            [4, 6],
+            'PNG com canal alfa: o FPDF não desenha, e a logo some em silêncio.',
+        );
+    }
+
+    #[Test]
     public function resolveOCodigoIbgeNoCabecalhoQuandoNaoHaNomeDoMunicipio(): void
     {
         // `xLocEmi` só existe no leiaute NACIONAL. Em XML ABRASF ele não vem, e

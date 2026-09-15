@@ -8,6 +8,22 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o 
 
 > **Nota sobre o histórico.** Este arquivo começa na `3.3.0`. As versões anteriores (24 tags, de `1.0.0` a `3.2.4`) não tinham changelog escrito e não serão reconstruídas a partir do log do Git.
 
+## [3.4.2] — 2026-09-15
+
+### Adicionado
+
+- **A logomarca oficial da NFS-e passa a ser distribuída com o pacote** (`imgs/nfse_logo.png`), baixada do endereço que a própria NT nº 008 indica (item 2.4.3). O código já a procurava nesse caminho desde a 3.3, mas o arquivo nunca existiu — então o cabeçalho caía no desenho em texto ("NFSe / Nota Fiscal de / Serviço eletrônico"), que não é a marca oficial. Vale para os dois layouts.
+
+  ⚠️ **A imagem é gravada SEM canal alfa, de propósito.** O FPDF lança `Alpha channel not supported` em PNG com transparência, e o `catch` do renderizador caía no texto **sem registrar nada** — o sintoma era "a logo não aparece", sem erro nenhum para investigar. Se um dia a imagem for substituída, achate o alfa antes.
+
+### Corrigido
+
+- **Endereço longo atravessava a divisória da coluna vizinha.** Os campos de coluna dupla (Nome, Endereço, E-mail) ocupam de X 0,30 a 10,51, mas a divisória de X 5,41 era desenhada descendo o bloco inteiro e cortava o texto ao meio. Agora ela desce apenas a faixa do título, onde as quatro colunas de fato existem; as demais linhas recebem só as divisórias que não cruzam campos largos.
+
+- **Faixa em branco entre um bloco suprimido e o seguinte.** A altura desenhada para a frase de supressão (`cell` de 0,32cm) e a altura descontada do deslocamento divergiam, e a sobra virava um espaço vazio com linhas soltas no meio do documento. As duas passam a usar a mesma constante.
+
+- **Vão em branco entre a descrição do serviço e a Tributação Municipal** quando havia blocos suprimidos acima. O espaço liberado era devolvido ao bloco de serviço, mas os blocos seguintes voltavam às coordenadas cruas da NT — a folga ficava presa no meio da página em vez de descer para as informações complementares (item 2.5.3).
+
 ## [3.4.1] — 2026-09-14
 
 ### Corrigido

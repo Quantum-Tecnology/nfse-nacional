@@ -37,19 +37,26 @@ class Danfse extends AbstractDanfse
     /**
      * Marca da NFS-e: imagem quando disponível, texto como alternativa.
      *
+     * Sem caixa informada (layout v1), a marca é desenhada com a altura fixa
+     * histórica, a 2mm da origem. Com caixa (layout v2), ela é ajustada para
+     * caber exatamente no espaço que a NT reserva à logomarca, sem distorcer a
+     * proporção do arquivo.
+     *
      * @param float       $x
      * @param float       $y
-     * @param string|null $logo Logo informada em render($logo)
+     * @param string|null $logo    Logo informada em render($logo)
+     * @param float|null  $largura Largura da caixa, em mm
+     * @param float|null  $altura  Altura da caixa, em mm
      * @return void
      */
-    protected function renderMarcaNfse($x, $y, $logo = null)
+    protected function renderMarcaNfse($x, $y, $logo = null, $largura = null, $altura = null)
     {
         $arquivo = $this->resolveLogo($logo);
 
         if (null === $arquivo) {
             // Sem imagem utilizável, cai no desenho em texto: um cabeçalho sem
             // marca alguma ficaria pior que a alternativa.
-            $this->renderMarcaEmTexto($x, $y);
+            $this->renderMarcaEmTexto($x, $y, $largura, $altura);
 
             return;
         }
@@ -57,21 +64,39 @@ class Danfse extends AbstractDanfse
         $dimensoes = @getimagesize($arquivo);
 
         if (false === $dimensoes || 0 === (int) $dimensoes[1]) {
-            $this->renderMarcaEmTexto($x, $y);
+            $this->renderMarcaEmTexto($x, $y, $largura, $altura);
 
             return;
         }
 
-        // Altura fixa; largura proporcional — assim a marca nunca invade o
-        // título central, independentemente do arquivo informado.
-        $altura  = 12;
-        $largura = round($dimensoes[0] * ($altura / $dimensoes[1]), 0);
-        $largura = min($largura, 32);
+        $proporcao = $dimensoes[0] / $dimensoes[1];
+
+        if (null !== $largura && null !== $altura) {
+            // Encaixa na caixa preservando a proporção: limita pela altura e,
+            // se ainda exceder a largura, limita pela largura.
+            $destinoH = $altura;
+            $destinoW = $destinoH * $proporcao;
+
+            if ($destinoW > $largura) {
+                $destinoW = $largura;
+                $destinoH = $destinoW / $proporcao;
+            }
+
+            $destinoX = $x;
+            $destinoY = $y + (($altura - $destinoH) / 2);
+        } else {
+            // Altura fixa; largura proporcional — assim a marca nunca invade o
+            // título central, independentemente do arquivo informado.
+            $destinoH = 12;
+            $destinoW = min(round($destinoH * $proporcao, 0), 32);
+            $destinoX = $x + 2;
+            $destinoY = $y + 2;
+        }
 
         try {
-            $this->pdf->Image($arquivo, $x + 2, $y + 2, $largura, $altura);
+            $this->pdf->Image($arquivo, $destinoX, $destinoY, $destinoW, $destinoH);
         } catch (Throwable $e) {
-            $this->renderMarcaEmTexto($x, $y);
+            $this->renderMarcaEmTexto($x, $y, $largura, $altura);
         }
     }
 
@@ -129,24 +154,45 @@ class Danfse extends AbstractDanfse
     }
 
     /**
-     * Marca em texto — mesma da versão simples, usada quando não há imagem.
+     * Marca em texto, usada quando não há imagem utilizável.
      *
-     * @param float $x
-     * @param float $y
+     * Com caixa informada (layout v2), o desenho é reduzido para caber no
+     * espaço que a NT reserva à logomarca — caso contrário o texto invadiria o
+     * bloco da chave de acesso, logo abaixo.
+     *
+     * @param float      $x
+     * @param float      $y
+     * @param float|null $largura Largura da caixa, em mm
+     * @param float|null $altura  Altura da caixa, em mm
      * @return void
      */
-    private function renderMarcaEmTexto($x, $y)
+    private function renderMarcaEmTexto($x, $y, $largura = null, $altura = null)
     {
-        $this->pdf->setFont($this->fontePadrao, 'B', 20);
-        $this->pdf->setXY($x + 2, $y + 3);
+        $temCaixa = null !== $largura && null !== $altura;
+
+        $marcaX = $temCaixa ? $x : $x + 2;
+        $marcaW = $temCaixa ? $largura : 30;
+
+        $this->pdf->setFont($this->fontePadrao, 'B', $temCaixa ? 10 : 20);
+        $this->pdf->setXY($marcaX, $temCaixa ? $y : $y + 3);
         $this->pdf->setTextColor(0, 128, 0); // Verde
-        $this->pdf->cell(30, 8, 'NFSe', 0, 0, 'L');
+        $this->pdf->cell($marcaW, $temCaixa ? 3.4 : 8, 'NFSe', 0, 0, 'L');
+
+        $this->pdf->setTextColor(0, 0, 0);
+
+        if ($temCaixa) {
+            // Na caixa da NT (8,5mm de altura) só há espaço para uma linha.
+            $this->pdf->setFont($this->fontePadrao, '', 4.5);
+            $this->pdf->setXY($marcaX, $y + 3.6);
+            $this->pdf->cell($marcaW, 2, 'Nota Fiscal de Serviço eletrônica', 0, 0, 'L');
+
+            return;
+        }
 
         $this->pdf->setFont($this->fontePadrao, '', 7);
-        $this->pdf->setTextColor(0, 0, 0);
-        $this->pdf->setXY($x + 2, $y + 10);
-        $this->pdf->cell(30, 3, 'Nota Fiscal de', 0, 1, 'L');
-        $this->pdf->setX($x + 2);
-        $this->pdf->cell(30, 3, 'Serviço eletrônico', 0, 0, 'L');
+        $this->pdf->setXY($marcaX, $y + 10);
+        $this->pdf->cell($marcaW, 3, 'Nota Fiscal de', 0, 1, 'L');
+        $this->pdf->setX($marcaX);
+        $this->pdf->cell($marcaW, 3, 'Serviço eletrônico', 0, 0, 'L');
     }
 }

@@ -8,6 +8,39 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o 
 
 > **Nota sobre o histórico.** Este arquivo começa na `3.3.0`. As versões anteriores (24 tags, de `1.0.0` a `3.2.4`) não tinham changelog escrito e não serão reconstruídas a partir do log do Git.
 
+## [3.4.0] — 2026-09-14
+
+DANFSe no modelo oficial da **NT SE/CGNFS-e nº 008 v1.02** (14/07/2026), com a versão do layout selecionável.
+
+### ⚠️ Requer atenção
+
+- **O DANFSe gerado muda de aparência.** O padrão passa a ser o layout **v2.0** — o modelo do Anexo I da NT nº 008. O documento tem blocos novos, outra ordem e outros rótulos; quem recebe o PDF vai notar.
+
+  O motivo de o padrão mudar agora: a **API de geração do DANFSe do Ambiente Nacional foi suspensa em 03/08/2026** (item 1 da NT). O PDF gerado localmente deixou de ser plano B e passou a ser o documento que o contribuinte entrega.
+
+  Para manter a aparência anterior, fixe o layout antigo na chamada:
+
+  ```php
+  (new Danfse($xml))->setLayout(Danfse::LAYOUT_V1)->render();
+  ```
+
+- **O layout v1.0 está congelado.** Ele é o desenho histórico desta biblioteca (herdado do `sped-da`) e **não corresponde ao modelo oficial de nenhuma versão** do DANFSe — nem do v1.0 publicado pelo CGNFS-e. Continua disponível, mas não receberá correções de conformidade. Para emitir, use o v2.0.
+
+### Adicionado
+
+- **Layout selecionável** por `setLayout()`, com as constantes `Danfse::LAYOUT_V1` e `Danfse::LAYOUT_V2`. Uma versão desconhecida cai no padrão em vez de lançar exceção: o método está no caminho de geração de um documento fiscal, e ficar sem PDF é pior que receber o layout vigente.
+- **Bloco "Destinatário da Operação"** (item 2.1.5), que não existia. É o adquirente para fins de IBS/CBS (`infDPS/IBSCBS/dest`) e nem sempre é o tomador do serviço — por isso ganha bloco próprio no modelo oficial.
+- **Tributação IBS/CBS completa** (item 2.1.10): CST/cClassTrib, indicador de operação, exclusões e reduções da base de cálculo, base após exclusões, reduções de alíquota e as **alíquotas efetivas** de IBS (UF e municipal) e CBS.
+- **Totais do item 2.1.11**: "Total das Retenções (ISSQN / Federais)", "Total do IBS/CBS" e "VALOR LÍQUIDO DA NFS-e + IBS/CBS".
+- **Supressões previstas na NT** (item 2.3 e notas 2 a 4): quando tomador, destinatário, intermediário ou a tributação municipal não se aplicam, o bloco não some — imprime a frase exigida. A ausência é informação fiscal tanto quanto a presença.
+- **Marca d'água** de nota `CANCELADA` / `SUBSTITUÍDA` e a expressão `NFS-e SEM VALIDADE JURÍDICA` em homologação (itens 2.4.3 e 2.5).
+
+### Corrigido
+
+- **PIS e COFINS eram contados duas vezes quando havia retenção.** Pela regra da NT v1.02 (pág. 19), com `tpRetPisCofins = 1` os campos de débito de apuração própria saem **zerados** e os valores migram para "Contribuições Sociais - Retidas". Antes, o mesmo tributo aparecia nos dois lugares.
+- **`ambGer` e `tpAmb` estavam no mesmo campo.** São coisas distintas no leiaute — `ambGer` diz *quem* gerou a NFS-e (prefeitura ou Sistema Nacional); `tpAmb`, se é produção ou homologação. O v2.0 exibe os dois separadamente, como o modelo oficial.
+- **Descrição de serviço com acento podia sumir do PDF inteiro, em silêncio.** A normalização de espaços usava `preg_replace` com o modificador `/u`, que devolve `NULL` para texto em ISO-8859-1 — o encoding dos dados após o parse.
+
 ## [3.3.1] — 2026-09-01
 
 ### Alterado

@@ -226,10 +226,13 @@ final class DanfseTest extends TestCase
             'Município',
             'Código de Tributação Nacional',
             'SERVIÇO PRESTADO',
-            'Inscrição Municipal',
+            // O v2.0 usa o rótulo da NT ("Indicador Municipal (Inscrição)") no
+            // lugar de "Inscrição Municipal"; o que este teste protege é o
+            // acento, então basta a palavra acentuada comum às duas versões.
+            'Inscrição',
             'Endereço',
-            'Número da NFS-e',
-            'Competência da NFS-e',
+            'NÚMERO DA NFS-E',
+            'COMPETÊNCIA DA NFS-E',
         ] as $rotulo) {
             $this->assertStringContainsString(
                 $rotulo,
@@ -254,12 +257,13 @@ final class DanfseTest extends TestCase
     {
         $texto = $this->normaliza($this->texto('nfse_autorizada_americana_sem_ibscbs.xml'));
 
-        // xTribNac desta nota é longa demais para a coluna e precisa ser cortada
-        // — o oficial faz igual. O corte não pode partir um caractere acentuado
-        // ao meio (sintoma: "Instru??o").
-        $this->assertStringContainsString('Instrução', $texto);
+        // O corte de texto longo não pode partir um caractere acentuado ao meio
+        // (sintoma: "Instru??o"). No v2.0 a descrição impressa é a MUNICIPAL
+        // quando existe (regra do item 2.4.5) — nesta nota, "Treinamento em
+        // informática" —, e a descrição do serviço vem do XML com acento.
+        $this->assertStringContainsString('informática', $texto);
+        $this->assertStringContainsString('Aviso Prévio', $texto, 'xDescServ não pode sumir.');
         $this->assertStringNotContainsString('??', $texto, 'Corte no meio de caractere multibyte.');
-        $this->assertStringContainsString('...', $texto, 'A descrição longa deve ser truncada.');
     }
 
     /*
@@ -275,8 +279,9 @@ final class DanfseTest extends TestCase
 
         // O oficial dedica uma faixa ao grupo mesmo quando ele não existe: a
         // ausência do intermediário é informação fiscal, não um vazio a omitir.
+        // A frase é a da nota 2 do item 2.4.5 da NT nº 008.
         $this->assertStringContainsString(
-            'INTERMEDIÁRIO DO SERVIÇO NÃO IDENTIFICADO NA NFS-e',
+            'INTERMEDIÁRIO DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e',
             $texto,
         );
     }
@@ -286,8 +291,11 @@ final class DanfseTest extends TestCase
     {
         $texto = $this->normaliza($this->texto('nfse_autorizada_americana_sem_ibscbs.xml'));
 
-        // Lei 12.741/2012 — o oficial traz as três esferas lado a lado.
-        $this->assertStringContainsString('TOTAIS APROXIMADOS DOS TRIBUTOS', $texto);
+        // Lei 12.741/2012 — informação obrigatória. No v2.0 ela deixa de ser um
+        // bloco próprio e passa a integrar "Informações Complementares", na
+        // frase fixa da nota 10 do item 2.4.5.
+        $this->assertStringContainsString('Totais Aproximados dos Tributos', $texto);
+        $this->assertStringContainsString('Lei nº 12.741/2012', $texto);
         $this->assertStringContainsString('Federais', $texto);
         $this->assertStringContainsString('Estaduais', $texto);
         $this->assertStringContainsString('Municipais', $texto);

@@ -82,6 +82,37 @@ Geração do PDF da DANFSe **diretamente a partir do XML**, sem precisar baixar 
 - **`Danfse`** — DANFSe completa a partir do XML autorizado.
 - **`DanfseSimples`** — renderização tolerante (lê só a estrutura, não exige assinatura), ideal para **rascunhos, prévias e notas recebidas via DFe**.
 
+> 🚨 **A API de geração do DANFSe do Ambiente Nacional foi suspensa em 03/08/2026** (item 1 da [NT nº 008](https://www.gov.br/nfse/pt-br/biblioteca/documentacao-tecnica)). O `consultarDanfse()` deixou de ser o caminho principal: **o PDF gerado por esta biblioteca é o documento que o contribuinte entrega.**
+
+#### Versão do layout: v2.0 (padrão) e v1.0
+
+A NT nº 008 v1.02 (14/07/2026) publicou o modelo **DANFSe v2.0**, que é o layout gerado por padrão:
+
+```php
+// Padrão — modelo oficial do Anexo I da NT nº 008
+$pdf = (new Danfse($xml))->render();
+
+// Layout antigo, para quem já se acostumou com ele
+$pdf = (new Danfse($xml))->setLayout(Danfse::LAYOUT_V1)->render();
+```
+
+| | `LAYOUT_V2` (padrão) | `LAYOUT_V1` |
+|---|---|---|
+| Origem | Anexo I da NT nº 008 v1.02 | Layout histórico, herdado do `sped-da` |
+| Conformidade | Modelo oficial vigente | **Não corresponde ao modelo oficial de nenhuma versão** |
+| Manutenção | Ativa | Congelado — sem correções de conformidade |
+
+O que o **v2.0** traz e o v1.0 não tem:
+
+- Bloco **Destinatário da Operação** (item 2.1.5) — o adquirente para fins de IBS/CBS (`infDPS/IBSCBS/dest`), que nem sempre é o tomador do serviço;
+- **Tributação IBS/CBS completa** (item 2.1.10): CST/cClassTrib, indicador de operação, exclusões e reduções da base de cálculo, e as **alíquotas efetivas** de IBS (UF e municipal) e CBS;
+- Totais do item 2.1.11: `Total das Retenções`, `Total do IBS/CBS` e **`VALOR LÍQUIDO DA NFS-e + IBS/CBS`**;
+- **Supressões previstas na NT** (item 2.3): quando tomador, destinatário, intermediário ou a tributação municipal não se aplicam, o bloco não some — imprime a frase exigida. A ausência é informação fiscal tanto quanto a presença;
+- Marca d'água de nota `CANCELADA` / `SUBSTITUÍDA` e a expressão `NFS-e SEM VALIDADE JURÍDICA` em homologação (itens 2.4.3 e 2.5);
+- Página única em A4 retrato, tipografia e sombreamento conforme os itens 2.2 e 2.4.
+
+> ⚠️ **Ao atualizar da 3.3 para a 3.4 o documento muda de aparência**, porque o padrão passou a ser o v2.0. Quem recebe o PDF vai notar. Para manter o visual anterior, fixe `setLayout(Danfse::LAYOUT_V1)` na chamada.
+
 Útil quando o ADN está indisponível, para pré-visualização antes da transmissão, ou para notas importadas que não têm PDF oficial salvo.
 
 ### ✅ Validação contra os XSDs oficiais
@@ -194,9 +225,19 @@ Todos os exemplos estão em [`examples/`](examples/) e rodam em PHP puro — bas
 
 ## ⚠️ Avisos importantes
 
-### DANFSe: o endpoint do ADN é intermitente
+### DANFSe: a API do ADN foi SUSPENSA em 03/08/2026
 
-`consultarDanfse()` pode voltar **vazio para uma chave válida** — indisponibilidade temporária do Ambiente Nacional, não "nota inexistente". Em produção, trate assim:
+A NT nº 008 (item 1) sobrestou a API de geração do DANFSe (`https://adn.nfse.gov.br/danfse/...`). **Gere o PDF localmente** — veja [DANFSe local](#-danfse-local-sem-depender-do-adn):
+
+```php
+$pdf = (new Danfse($xml))->render(); // modelo oficial v2.0
+```
+
+O `consultarDanfse()` continua no pacote para quem ainda o usa contra endpoint de prefeitura, e o comportamento descrito abaixo vale para esses casos.
+
+#### Quando o endpoint responde, ele é intermitente
+
+`consultarDanfse()` pode voltar **vazio para uma chave válida** — indisponibilidade temporária, não "nota inexistente". Em produção, trate assim:
 
 1. **Repita algumas vezes** antes de desistir (com espera progressiva);
 2. **Confira a assinatura do PDF** (`str_starts_with($retorno, '%PDF')`) — o endpoint também devolve JSON de erro;

@@ -36,6 +36,31 @@ abstract class AbstractDanfse extends DaCommon
     const FONTE_ACENTUADA = 'dejavusanscondensed';
 
     /**
+     * Layout histórico desta biblioteca, herdado do sped-da.
+     *
+     * NÃO corresponde ao modelo oficial de nenhuma versão do DANFSe: é o
+     * desenho que a lib sempre produziu, mantido para quem já o utiliza.
+     */
+    const LAYOUT_V1 = '1.0';
+
+    /**
+     * Modelo oficial do Anexo I da Nota Técnica nº 008 v1.02 (14/07/2026).
+     */
+    const LAYOUT_V2 = '2.0';
+
+    /**
+     * Versão do layout a desenhar.
+     *
+     * O padrão é o v2.0 porque é o modelo em vigor: a NT nº 008 suspendeu a API
+     * de geração do DANFSe do Ambiente Nacional em 03/08/2026, de modo que o
+     * render local deixou de ser plano B e passou a ser o documento que o
+     * contribuinte entrega.
+     *
+     * @var string
+     */
+    protected $layoutVersao = self::LAYOUT_V2;
+
+    /**
      * Tamanho do Papel
      * @var string
      */
@@ -100,6 +125,16 @@ abstract class AbstractDanfse extends DaCommon
      * @var array
      */
     protected $intermediario = [];
+
+    /**
+     * Dados do destinatário da operação (bloco próprio no DANFSe v2.0).
+     *
+     * Vive em `infDPS/IBSCBS/dest` — é o adquirente do IBS/CBS, que nem sempre
+     * é o tomador do serviço. O layout v1 não tem esse bloco.
+     *
+     * @var array
+     */
+    protected $destinatario = [];
 
     /**
      * Dados do órgão emissor exibidos no cabeçalho (opcional).
@@ -184,6 +219,7 @@ abstract class AbstractDanfse extends DaCommon
         $this->servico = $this->convertDataToPdfEncoding($this->servico);
         $this->ibsCbs = $this->convertDataToPdfEncoding($this->ibsCbs);
         $this->intermediario = $this->convertDataToPdfEncoding($this->intermediario);
+        $this->destinatario = $this->convertDataToPdfEncoding($this->destinatario);
     }
 
     /**
@@ -192,7 +228,7 @@ abstract class AbstractDanfse extends DaCommon
      * @param mixed $data
      * @return mixed
      */
-    private function convertDataToPdfEncoding($data)
+    protected function convertDataToPdfEncoding($data)
     {
         if (is_array($data)) {
             foreach ($data as $key => $value) {
@@ -266,6 +302,23 @@ abstract class AbstractDanfse extends DaCommon
             'tributacao_municipal' => $infNfse['xTribMun'] ?? '',
             'descricao_nbs' => $infNfse['xNBS'] ?? '',
             'outras_informacoes' => $infNfse['xOutInf'] ?? '',
+
+            // --- Campos exigidos pelo DANFSe v2.0 ---
+
+            // ATENÇÃO: `ambiente` acima mistura dois conceitos distintos do
+            // leiaute (ambGer = QUEM gerou; tpAmb = produção ou homologação).
+            // O v1 usa a chave antiga; o v2 exibe os dois em campos separados,
+            // como o modelo oficial, então cada um ganha chave própria.
+            'ambiente_gerador' => $infNfse['ambGer'] ?? '',
+            'tipo_ambiente' => $dps['tpAmb'] ?? $infNfse['ambGer'] ?? 2,
+            'tipo_emitente' => $dps['tpEmit'] ?? '1',
+            'finalidade' => $dps['IBSCBS']['finNFSe'] ?? '0',
+
+            // Substituição (nota 7): a chave da nota substituída vai para as
+            // informações complementares; a da substituta marca esta como
+            // substituída e dispara a marca d'água.
+            'chave_substituida' => $dps['subst']['chSubstda'] ?? '',
+            'chave_substituta' => $infNfse['NFSeSubstituidora'] ?? '',
         ];
 
         // Dados do Prestador (emit no padrão nacional)
@@ -412,6 +465,15 @@ abstract class AbstractDanfse extends DaCommon
             'tipo_imunidade' => $tribMun['tpImunidade'] ?? '',
             'regime_especial' => $regTrib['regEspTrib'] ?? '',
             'info_complementar' => $infoCompl['xInfComp'] ?? '',
+
+            // --- Campos exigidos pelo DANFSe v2.0 (itens 2.1.8 e 2.1.12) ---
+            'suspensao_exigibilidade' => $tribMun['exigSusp']['tpSusp'] ?? '',
+            'numero_processo_suspensao' => $tribMun['exigSusp']['nProcesso'] ?? '',
+            'beneficio_municipal' => $tribMun['BM']['tpBM'] ?? '',
+            'codigo_obra' => $serv['obra']['cObra'] ?? '',
+            'inscricao_imobiliaria' => $serv['obra']['inscImobFisc']
+                ?? $dps['IBSCBS']['imovel']['inscImobFisc'] ?? '',
+            'codigo_evento' => $serv['atvEvento']['idAtvEvt'] ?? '',
             'valores' => [
                 'servicos' => $valorServico,
                 'deducoes' => $valorDeducoes,
@@ -426,6 +488,7 @@ abstract class AbstractDanfse extends DaCommon
                 'ir' => $vIR,
                 'csll' => $vCSLL,
                 'ret_pis_cofins' => $retPisCofins,
+                'calculo_bm' => (float) ($tribMun['BM']['vCalcBM'] ?? $tribMun['BM']['vRedBCBM'] ?? 0),
                 'outras_retencoes' => 0,
                 'desconto_incondicionado' => $valorDescontoIncond,
                 'desconto_condicionado' => $valorDescontoCond,
@@ -433,6 +496,28 @@ abstract class AbstractDanfse extends DaCommon
                 'total_tributos_federais' => $totTribFed,
                 'total_tributos_estaduais' => $totTribEst,
                 'total_tributos_municipais' => $totTribMun,
+
+                // --- Campos exigidos pelo DANFSe v2.0 ---
+
+                // "Total das Retenções (ISSQN / Federais)" (item 2.1.11). O XML
+                // traz vTotalRet pronto; sem ele, soma o que foi efetivamente
+                // retido — e PIS/COFINS só entram quando tpRetPisCofins = 1.
+                'total_retencoes' => (float) ($valoresNfse['vTotalRet'] ?? (
+                    (1 === $issRetido ? $vISS : 0)
+                    + $vIR + $vINSS + $vCSLL
+                    + (1 === $retPisCofins ? $vPIS + $vCOFINS : 0)
+                )),
+
+                // Regra da NT 008 v1.02 (notas dos campos, pág. 19): com
+                // PIS/COFINS RETIDO (tpRetPisCofins = 1), os campos de débito de
+                // apuração própria saem ZERADOS e os valores migram para
+                // "Contribuições Sociais - Retidas". Imprimir vPis nos dois
+                // lugares contaria o mesmo tributo duas vezes.
+                'pis_debito_proprio' => 1 === $retPisCofins ? 0.0 : $vPIS,
+                'cofins_debito_proprio' => 1 === $retPisCofins ? 0.0 : $vCOFINS,
+                'contribuicoes_sociais_retidas' => 1 === $retPisCofins
+                    ? $vCSLL + $vPIS + $vCOFINS
+                    : $vCSLL,
             ],
         ];
 
@@ -455,6 +540,36 @@ abstract class AbstractDanfse extends DaCommon
                 $endNacInt['xMun'] ?? '',
                 $endNacInt['UF'] ?? ''
             ),
+        ];
+
+        // Destinatário da operação — bloco próprio do DANFSe v2.0. Mora dentro
+        // do grupo IBSCBS do DPS (é o adquirente para fins de IBS/CBS) e NÃO é
+        // necessariamente o tomador do serviço: por isso ganha bloco separado no
+        // modelo oficial. Repare que não há IM aqui, ao contrário dos demais.
+        $dest       = $dps['IBSCBS']['dest'] ?? [];
+        $endDest    = $dest['end'] ?? [];
+        $endNacDest = $endDest['endNac'] ?? $endDest['endExt'] ?? $endDest;
+
+        $this->destinatario = [] === $dest ? [] : [
+            'razao_social' => $dest['xNome'] ?? '',
+            'cnpj' => $dest['CNPJ'] ?? '',
+            'cpf' => $dest['CPF'] ?? '',
+            'nif' => $dest['NIF'] ?? '',
+            'fone' => $dest['fone'] ?? '',
+            'email' => $dest['email'] ?? '',
+            'municipio' => $this->formatarMunicipio(
+                $endNacDest['cMun'] ?? '',
+                $endNacDest['xMun'] ?? $endNacDest['xCidade'] ?? '',
+                $endNacDest['UF'] ?? ''
+            ),
+            'codigo_municipio' => $endNacDest['cMun'] ?? '',
+            'cep' => $endNacDest['CEP'] ?? $endNacDest['cEndPost'] ?? '',
+            'endereco' => [
+                'logradouro' => $endNacDest['xLgr'] ?? '',
+                'numero' => $endNacDest['nro'] ?? '',
+                'complemento' => $endNacDest['xCpl'] ?? '',
+                'bairro' => $endNacDest['xBairro'] ?? '',
+            ],
         ];
 
         $this->parseIbsCbs($infNfse, $dps);
@@ -489,8 +604,9 @@ abstract class AbstractDanfse extends DaCommon
         $gIBS     = $totCIBS['gIBS'] ?? [];
         $gCBS     = $totCIBS['gCBS'] ?? [];
 
-        // Lado DPS: o que foi declarado (CST/cClassTrib).
-        $gIBSCBS = $dps['IBSCBS']['valores']['trib']['gIBSCBS'] ?? [];
+        // Lado DPS: o que foi declarado (CST/cClassTrib/indicador de operação).
+        $dpsIbsCbs = $dps['IBSCBS'] ?? [];
+        $gIBSCBS   = $dpsIbsCbs['valores']['trib']['gIBSCBS'] ?? [];
 
         $this->ibsCbs = [
             'presente' => [] !== $grupo,
@@ -511,7 +627,54 @@ abstract class AbstractDanfse extends DaCommon
             // vTotNF é o total da nota já com IBS/CBS. Em 2026 (ano de teste)
             // equivale a vLiq; a partir de 2027 passa a ser vLiq + vCBS + vIBS.
             'valor_total' => (float)($totCIBS['vTotNF'] ?? 0),
+
+            // --- Campos exigidos pelo DANFSe v2.0 (NT 008, item 2.1.10) ---
+
+            // Indicador da operação, concatenado no documento com a localidade
+            // de incidência: "cIndOp / cLocalidade / Município / UF".
+            'indicador_operacao' => $dpsIbsCbs['cIndOp'] ?? '',
+            'codigo_localidade_incidencia' => $grupo['cLocalidadeIncid'] ?? '',
+
+            // Alíquotas EFETIVAS: o que de fato incidiu depois das reduções.
+            // Não são as nominais acima — numa operação com redução as duas
+            // divergem, e o documento oficial exibe ambas.
+            'aliquota_efetiva_ibs_uf' => (float)($valores['uf']['pAliqEfetUF'] ?? 0),
+            'aliquota_efetiva_ibs_mun' => (float)($valores['mun']['pAliqEfetMun'] ?? 0),
+            'aliquota_efetiva_cbs' => (float)($valores['fed']['pAliqEfetCBS'] ?? 0),
+
+            // Reduções de alíquota declaradas (impressas como "% / % / %").
+            'reducao_aliquota_ibs_uf' => (float)($valores['uf']['pRedAliqUF'] ?? 0),
+            'reducao_aliquota_ibs_mun' => (float)($valores['mun']['pRedAliqMun'] ?? 0),
+            'reducao_aliquota_cbs' => (float)($valores['fed']['pRedAliqCBS'] ?? 0),
+
+            // "Exclusões e Reduções da Base de Cálculo" é somatório, não um campo
+            // do XML: vDescIncond + vCalcReeRepRes + vISSQN + vPIS + vCOFINS
+            // (NT 008, item 2.4.5).
+            'exclusoes_reducoes_bc' => $this->somaExclusoesReducoesBc($valores),
+            'valor_reembolso' => (float)($valores['vCalcReeRepRes'] ?? 0),
         ];
+    }
+
+    /**
+     * Somatório das "Exclusões e Reduções da Base de Cálculo" do IBS/CBS.
+     *
+     * A NT 008 (2.4.5) define o campo como a soma de vDescIncond,
+     * vCalcReeRepRes, vISSQN, vPIS e vCOFINS — e não como uma tag do XML. Como
+     * `$this->servico` já está resolvido quando parseIbsCbs roda, os tributos
+     * saem de lá em vez de serem relidos da árvore.
+     *
+     * @param array $valoresIbsCbs Grupo `infNFSe/IBSCBS/valores`
+     * @return float
+     */
+    private function somaExclusoesReducoesBc(array $valoresIbsCbs)
+    {
+        $valores = $this->servico['valores'] ?? [];
+
+        return (float) ($valores['desconto_incondicionado'] ?? 0)
+            + (float) ($valoresIbsCbs['vCalcReeRepRes'] ?? 0)
+            + (float) ($valores['iss'] ?? 0)
+            + (float) ($valores['pis'] ?? 0)
+            + (float) ($valores['cofins'] ?? 0);
     }
 
     /**
@@ -626,7 +789,139 @@ abstract class AbstractDanfse extends DaCommon
         $this->pdf->settextcolor(0, 0, 0);
         $this->pdf->setAutoPageBreak(true, $this->marginf);
 
-        // Renderiza o conteúdo
+        // Quem desenha é a estratégia de layout — ver setLayout().
+        $this->resolveLayout()->desenha($this, $logo);
+    }
+
+    /**
+     * Nota já interpretada, para consumo dos layouts.
+     *
+     * Os layouts leem estes dados, nunca o XML: o parsing é responsabilidade
+     * desta classe e precisa valer igual para todas as versões do documento.
+     *
+     * @return array{
+     *     infNfse: array, prestador: array, tomador: array, destinatario: array,
+     *     intermediario: array, servico: array, ibsCbs: array, orgaoEmissor: array
+     * }
+     */
+    public function dadosDaNota()
+    {
+        return [
+            'infNfse'       => $this->infNfse,
+            'prestador'     => $this->prestador,
+            'tomador'       => $this->tomador,
+            'destinatario'  => $this->destinatario,
+            'intermediario' => $this->intermediario,
+            'servico'       => $this->servico,
+            'ibsCbs'        => $this->ibsCbs,
+            'orgaoEmissor'  => $this->orgaoEmissor,
+        ];
+    }
+
+    /**
+     * Desenha a marca da NFS-e numa área definida pelo layout.
+     *
+     * O v1 posiciona a marca por conta própria; o v2 tem coordenada e caixa
+     * fixadas pela NT (0,85 × 4,00 @ 0,49/0,44), então precisa mandar o espaço.
+     * A forma de desenhar continua sendo decisão da subclasse (imagem ou texto).
+     *
+     * @param float       $x       Em mm
+     * @param float       $y       Em mm
+     * @param float       $largura Em mm
+     * @param float       $altura  Em mm
+     * @param string|null $logo
+     * @return void
+     */
+    public function desenhaMarcaNoLayout($x, $y, $largura, $altura, $logo = null)
+    {
+        $this->renderMarcaNfse($x, $y, $logo, $largura, $altura);
+    }
+
+    /**
+     * Desenha o QR Code de consulta pública na posição exigida pelo layout.
+     *
+     * @param float $x    Em mm
+     * @param float $y    Em mm
+     * @param float $lado Em mm
+     * @return void
+     */
+    public function desenhaQrCodeNoLayout($x, $y, $lado)
+    {
+        $this->desenhaQrCode($x, $y, $lado);
+    }
+
+    /**
+     * Formata CNPJ/CPF para os layouts.
+     *
+     * @param string $documento
+     * @return string
+     */
+    public function formatarDocumentoNoLayout($documento)
+    {
+        return $this->formatarCnpjCpf($documento);
+    }
+
+    /**
+     * Formata data para os layouts.
+     *
+     * @param string $valor
+     * @param string $formato
+     * @return string
+     */
+    public function formatarDataNoLayout($valor, $formato = 'd/m/Y H:i:s')
+    {
+        return $this->formatarData($valor, $formato);
+    }
+
+    /**
+     * Corta texto na largura disponível, para uso dos layouts.
+     *
+     * Exposto porque o recorte depende do encoding da fonte já registrada — e
+     * essa lógica (que evita partir caractere acentuado ao meio) não deve ser
+     * reimplementada por versão de layout.
+     *
+     * @param string $texto
+     * @param float  $larguraMm
+     * @return string
+     */
+    public function truncaNoLayout($texto, $larguraMm)
+    {
+        return $this->truncaNaLargura($texto, $larguraMm);
+    }
+
+    /**
+     * Objeto de PDF em uso (já inicializado por {@see monta()}).
+     *
+     * @return Pdf
+     */
+    public function pdf()
+    {
+        return $this->pdf;
+    }
+
+    /**
+     * Fonte ativa — a acentuada quando o registro deu certo.
+     *
+     * @return string
+     */
+    public function fonte()
+    {
+        return $this->fontePadrao;
+    }
+
+    /**
+     * Sequência de seções do layout v1, na ordem histórica.
+     *
+     * Mora aqui, e não em {@see Layout\LayoutV1}, porque as seções do v1 são
+     * métodos desta classe que dependem do estado do desenho (cada uma continua
+     * de onde a anterior parou, via `getY()`). Movê-las para fora exigiria
+     * reescrevê-las — e o compromisso do v1 é sair exatamente como saía.
+     *
+     * @param string|null $logo
+     * @return void
+     */
+    public function desenhaSecoesV1($logo = null)
+    {
         $this->renderCabecalho($logo);
         $this->renderPrestador();
         $this->renderTomador();
@@ -636,6 +931,53 @@ abstract class AbstractDanfse extends DaCommon
         $this->renderIbsCbs();
         $this->renderTotaisAproximados();
         $this->renderRodape();
+    }
+
+    /**
+     * Escolhe a versão do layout do documento.
+     *
+     * ```php
+     * (new Danfse($xml))->setLayout(Danfse::LAYOUT_V1)->render();
+     * ```
+     *
+     * Versão desconhecida cai no padrão em vez de lançar: este método está no
+     * caminho de geração de um documento fiscal, e ficar sem PDF é pior que
+     * receber o layout vigente.
+     *
+     * @param string $versao {@see LAYOUT_V1} ou {@see LAYOUT_V2}
+     * @return $this
+     */
+    public function setLayout($versao)
+    {
+        $versao = trim((string) $versao);
+
+        $this->layoutVersao = in_array($versao, [self::LAYOUT_V1, self::LAYOUT_V2], true)
+            ? $versao
+            : self::LAYOUT_V2;
+
+        return $this;
+    }
+
+    /**
+     * Versão de layout em uso.
+     *
+     * @return string
+     */
+    public function getLayout()
+    {
+        return $this->layoutVersao;
+    }
+
+    /**
+     * Instancia a estratégia de desenho da versão escolhida.
+     *
+     * @return Layout\LayoutDanfseInterface
+     */
+    protected function resolveLayout()
+    {
+        return self::LAYOUT_V1 === $this->layoutVersao
+            ? new Layout\LayoutV1()
+            : new Layout\LayoutV2();
     }
 
     /**
@@ -781,7 +1123,7 @@ abstract class AbstractDanfse extends DaCommon
      * 
      * @return void
      */
-    private function renderPrestador()
+    protected function renderPrestador()
     {
         $y = $this->pdf->getY() + 2;
         $x = $this->margesq;
@@ -876,7 +1218,7 @@ abstract class AbstractDanfse extends DaCommon
      * 
      * @return void
      */
-    private function renderTomador()
+    protected function renderTomador()
     {
         $y = $this->pdf->getY() + 1;
         $x = $this->margesq;
@@ -956,7 +1298,7 @@ abstract class AbstractDanfse extends DaCommon
      * 
      * @return void
      */
-    private function renderServico()
+    protected function renderServico()
     {
         $y = $this->pdf->getY() + 1;
         $x = $this->margesq;
@@ -1072,7 +1414,7 @@ abstract class AbstractDanfse extends DaCommon
      * 
      * @return void
      */
-    private function renderValores()
+    protected function renderValores()
     {
         $y = $this->pdf->getY() + 1;
         $x = $this->margesq;
@@ -1228,7 +1570,7 @@ abstract class AbstractDanfse extends DaCommon
      *
      * @return void
      */
-    private function renderIbsCbs()
+    protected function renderIbsCbs()
     {
         $y = $this->pdf->getY() + 1;
         $x = $this->margesq;
@@ -1338,7 +1680,7 @@ abstract class AbstractDanfse extends DaCommon
      * @param float $limiteDireito Onde começa a área do QR Code
      * @return void
      */
-    private function renderOrgaoEmissor($x, $y, $limiteDireito)
+    protected function renderOrgaoEmissor($x, $y, $limiteDireito)
     {
         if ([] === $this->orgaoEmissor) {
             return;
@@ -1391,7 +1733,7 @@ abstract class AbstractDanfse extends DaCommon
      *
      * @return void
      */
-    private function renderIntermediario()
+    protected function renderIntermediario()
     {
         $y = $this->pdf->getY() + 1;
         $x = $this->margesq;
@@ -1460,7 +1802,7 @@ abstract class AbstractDanfse extends DaCommon
      *
      * @return void
      */
-    private function renderTotaisAproximados()
+    protected function renderTotaisAproximados()
     {
         $y = $this->pdf->getY() + 1;
         $x = $this->margesq;
@@ -1497,7 +1839,7 @@ abstract class AbstractDanfse extends DaCommon
      * @param float $valor
      * @return string
      */
-    private function valorOuTraco($valor)
+    protected function valorOuTraco($valor)
     {
         return (float) $valor > 0 ? 'R$ ' . $this->formatarValor($valor) : '-';
     }
@@ -1508,7 +1850,7 @@ abstract class AbstractDanfse extends DaCommon
      * @param float $valor
      * @return string
      */
-    private function formatarPercentual($valor)
+    protected function formatarPercentual($valor)
     {
         return number_format((float) $valor, 2, ',', '.') . ' %';
     }
@@ -1518,7 +1860,7 @@ abstract class AbstractDanfse extends DaCommon
      *
      * @return void
      */
-    private function renderRodape()
+    protected function renderRodape()
     {
         $y = $this->pdf->getY() + 1;
         $x = $this->margesq;
@@ -1573,7 +1915,7 @@ abstract class AbstractDanfse extends DaCommon
      * @param array $endereco
      * @return string
      */
-    private function montarEnderecoSimples($endereco)
+    protected function montarEnderecoSimples($endereco)
     {
         if (empty($endereco)) {
             return '';
@@ -1606,7 +1948,7 @@ abstract class AbstractDanfse extends DaCommon
      * @param string $cep
      * @return string
      */
-    private function formatarCep($cep)
+    protected function formatarCep($cep)
     {
         if (empty($cep)) {
             return '';
@@ -1640,7 +1982,7 @@ abstract class AbstractDanfse extends DaCommon
      *
      * @return void
      */
-    private function registraFonteAcentuada()
+    protected function registraFonteAcentuada()
     {
         try {
             $this->pdf->addFont(self::FONTE_ACENTUADA, '', 'dejavusanscondensed.php');
@@ -1666,7 +2008,7 @@ abstract class AbstractDanfse extends DaCommon
      * @param float  $largura Largura útil, em mm
      * @return string
      */
-    private function truncaNaLargura($texto, $largura)
+    protected function truncaNaLargura($texto, $largura)
     {
         $texto = (string) $texto;
 
@@ -1706,7 +2048,7 @@ abstract class AbstractDanfse extends DaCommon
      * @param string|null $valor
      * @return string
      */
-    private function ouTraco($valor)
+    protected function ouTraco($valor)
     {
         $valor = trim((string) $valor);
 
@@ -1720,7 +2062,7 @@ abstract class AbstractDanfse extends DaCommon
      * @param string $descricao
      * @return string
      */
-    private function codigoComDescricao($codigo, $descricao)
+    protected function codigoComDescricao($codigo, $descricao)
     {
         $codigo    = trim((string) $codigo);
         $descricao = trim((string) $descricao);
@@ -1739,7 +2081,7 @@ abstract class AbstractDanfse extends DaCommon
      * @param string|int $codigo
      * @return string
      */
-    private function nomePais($codigo)
+    protected function nomePais($codigo)
     {
         $codigo = trim((string) $codigo);
 
@@ -1761,7 +2103,7 @@ abstract class AbstractDanfse extends DaCommon
      * @param string|int $codigo
      * @return string
      */
-    private function getOptanteSimplesNacional($codigo)
+    protected function getOptanteSimplesNacional($codigo)
     {
         $situacoes = [
             '1' => 'Não Optante',
@@ -1778,7 +2120,7 @@ abstract class AbstractDanfse extends DaCommon
      * @param string|int $codigo
      * @return string
      */
-    private function getRegimeApuracaoSN($codigo)
+    protected function getRegimeApuracaoSN($codigo)
     {
         $regimes = [
             '1' => 'Regime de apuração dos tributos federais e municipal pelo Simples Nacional',
@@ -1796,7 +2138,7 @@ abstract class AbstractDanfse extends DaCommon
      * @param string|int $codigo
      * @return string
      */
-    private function getRegimeEspecialTributacao($codigo)
+    protected function getRegimeEspecialTributacao($codigo)
     {
         $regimes = [
             '0' => 'Nenhum',
@@ -1817,7 +2159,7 @@ abstract class AbstractDanfse extends DaCommon
      * @param float $valor
      * @return string
      */
-    private function formatarValor($valor)
+    protected function formatarValor($valor)
     {
         $decimals = $this->decimalPlaces ?? 2;
         return number_format((float)$valor, $decimals, ',', '.');
@@ -1829,7 +2171,7 @@ abstract class AbstractDanfse extends DaCommon
      * @param string $doc
      * @return string
      */
-    private function formatarCnpjCpf($doc)
+    protected function formatarCnpjCpf($doc)
     {
         $doc = preg_replace('/[^0-9]/', '', $doc);
         
@@ -1858,7 +2200,7 @@ abstract class AbstractDanfse extends DaCommon
      * @param string $formato Formato de saída (padrão: d/m/Y H:i:s)
      * @return string
      */
-    private function formatarData($data, $formato = 'd/m/Y H:i:s')
+    protected function formatarData($data, $formato = 'd/m/Y H:i:s')
     {
         if (empty($data)) {
             return '';
@@ -1878,7 +2220,7 @@ abstract class AbstractDanfse extends DaCommon
      * @param array $endereco
      * @return string
      */
-    private function montarEndereco($endereco)
+    protected function montarEndereco($endereco)
     {
         if (empty($endereco)) {
             return '';
@@ -2030,7 +2372,7 @@ abstract class AbstractDanfse extends DaCommon
      * @param string|null $logo Logo informado em render($logo)
      * @return void
      */
-    abstract protected function renderMarcaNfse($x, $y, $logo = null);
+    abstract protected function renderMarcaNfse($x, $y, $logo = null, $largura = null, $altura = null);
 
     /**
      * Desenha o QR Code de consulta e o texto de autenticidade ao lado.

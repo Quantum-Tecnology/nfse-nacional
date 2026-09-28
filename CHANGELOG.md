@@ -8,6 +8,13 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o 
 
 > **Nota sobre o histórico.** Este arquivo começa na `3.3.0`. As versões anteriores (24 tags, de `1.0.0` a `3.2.4`) não tinham changelog escrito e não serão reconstruídas a partir do log do Git.
 
+## [3.4.3] — 2026-09-28
+
+### Corrigido
+
+- **DANFSe v2.0: frases de bloco suprimido sobrepostas.** Sem tomador (nota 2), "TOMADOR/ADQUIRENTE DA OPERAÇÃO NÃO IDENTIFICADO" e "DESTINATÁRIO DA OPERAÇÃO NÃO IDENTIFICADO" saíam **uma em cima da outra**. O `suprimeBloco()` recebia a altura do bloco à mão e somava a faixa de título de novo — que já está dentro da distância entre os blocos —, então o bloco seguinte subia exatamente para cima da faixa. A altura agora vem da própria tabela `Y` (distância até o bloco seguinte). O mesmo erro deixava folgas tortas depois do destinatário, do intermediário e do ISSQN suprimidos. Apareceu agora porque o tomador passou a ser opcional.
+- Teste novo mede a **posição** das frases no PDF (os testes de texto não pegavam bloco fora de lugar).
+
 ## [3.4.2] — 2026-09-15
 
 ### Adicionado

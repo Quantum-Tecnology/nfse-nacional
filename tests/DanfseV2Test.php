@@ -188,6 +188,78 @@ final class DanfseV2Test extends TestCase
         $this->assertStringContainsString('INTERMEDIÁRIO DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e', $texto);
     }
 
+    #[Test]
+    public function blocosSuprimidosEmSequenciaNaoSeSobrepoem(): void
+    {
+        // Regressão: sem tomador (nota 2), o desconto de altura somava a faixa
+        // de título DUAS vezes e o destinatário subia exatamente para cima da
+        // faixa do tomador — "TOMADOR..." e "DESTINATÁRIO..." saíam uma sobre
+        // a outra. Texto extraído não pega isso: aqui medimos a POSIÇÃO.
+        $xml = (string) preg_replace('#<toma>.*?</toma>#s', '', $this->xml('nfse_autorizada_americana_sem_ibscbs.xml'));
+
+        $y = $this->alturasDasFrases($xml, [
+            'tomador'       => 'TOMADOR/ADQUIRENTE DA OPERA',
+            'destinatario'  => 'DESTINAT',
+            'intermediario' => 'INTERMEDI',
+        ]);
+
+        // A faixa suprimida tem 0,45cm (≈12,8pt). Entre uma frase e a seguinte
+        // tem de caber a faixa inteira — e não mais que um bloco de sobra.
+        $faixa = 4.5 * 72 / 25.4;
+
+        $this->assertEqualsWithDelta($faixa, $y['tomador'] - $y['destinatario'], 1.0, 'Tomador e destinatário sobrepostos ou afastados.');
+        $this->assertEqualsWithDelta($faixa, $y['destinatario'] - $y['intermediario'], 1.0, 'Destinatário e intermediário sobrepostos ou afastados.');
+    }
+
+    /**
+     * Y (pt, origem embaixo) da primeira ocorrência de cada frase na página 1.
+     *
+     * @param array<string, string> $frases
+     *
+     * @return array<string, float>
+     */
+    private function alturasDasFrases(string $xml, array $frases): array
+    {
+        $nivelAnterior = error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
+
+        try {
+            $pdf = (new DanfseSimples($xml))->render();
+        } finally {
+            error_reporting($nivelAnterior);
+        }
+
+        // O smalot não extrai posição de PDF do FPDF (getDataTm quebra). Lemos
+        // direto do fluxo de conteúdo: o FPDF escreve "BT x y Td (texto) Tj ET".
+        $conteudo = '';
+
+        preg_match_all('#stream?
+(.*?)?
+endstream#s', $pdf, $fluxos);
+
+        foreach ($fluxos[1] as $fluxo) {
+            $conteudo .= (@gzuncompress($fluxo) ?: $fluxo) . "
+";
+        }
+
+        preg_match_all('#BT ([\d.]+) ([\d.]+) Td \((.*?)\) Tj ET#s', $conteudo, $textos, PREG_SET_ORDER);
+
+        $y = [];
+
+        foreach ($frases as $chave => $frase) {
+            foreach ($textos as $t) {
+                if (str_contains($t[3], $frase) && str_contains($t[3], 'IDENTIFICADO')) {
+                    $y[$chave] = (float) $t[2];
+
+                    break;
+                }
+            }
+
+            $this->assertArrayHasKey($chave, $y, "Frase não encontrada no PDF: {$frase}");
+        }
+
+        return $y;
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Conteúdo dos campos (item 2.4.5)

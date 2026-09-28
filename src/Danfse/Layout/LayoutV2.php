@@ -488,7 +488,7 @@ class LayoutV2 implements LayoutDanfseInterface
         $end = $t['endereco'] ?? [];
 
         if ($this->parteVazia($t)) {
-            $this->suprimeBloco('TOMADOR/ADQUIRENTE DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e', 'tomador', 1.94);
+            $this->suprimeBloco('TOMADOR/ADQUIRENTE DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e', 'tomador');
 
             return;
         }
@@ -525,13 +525,13 @@ class LayoutV2 implements LayoutDanfseInterface
         $end = $d['endereco'] ?? [];
 
         if ($this->parteVazia($d)) {
-            $this->suprimeBloco('DESTINATÁRIO DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e', 'destinatario', 1.30);
+            $this->suprimeBloco('DESTINATÁRIO DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e', 'destinatario');
 
             return;
         }
 
         if ($this->destinatarioEhOTomador()) {
-            $this->suprimeBloco('O DESTINATÁRIO É O PRÓPRIO TOMADOR/ADQUIRENTE DA OPERAÇÃO', 'destinatario', 1.30);
+            $this->suprimeBloco('O DESTINATÁRIO É O PRÓPRIO TOMADOR/ADQUIRENTE DA OPERAÇÃO', 'destinatario');
 
             return;
         }
@@ -562,7 +562,7 @@ class LayoutV2 implements LayoutDanfseInterface
         $i = $this->dados['intermediario'];
 
         if ($this->parteVazia($i)) {
-            $this->suprimeBloco('INTERMEDIÁRIO DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e', 'intermediario', 1.30);
+            $this->suprimeBloco('INTERMEDIÁRIO DA OPERAÇÃO NÃO IDENTIFICADO NA NFS-e', 'intermediario');
 
             return;
         }
@@ -667,7 +667,7 @@ class LayoutV2 implements LayoutDanfseInterface
         // tribISSQN = 2 (não incidência) / 4 (imune) descrevem operação fora do
         // campo do ISSQN — é o caso da supressão da nota 4.
         if (!$this->sujeitaAoIssqn()) {
-            $this->suprimeBloco('TRIBUTAÇÃO MUNICIPAL (ISSQN) - OPERAÇÃO NÃO SUJEITA AO ISSQN', 'issqn', 1.94);
+            $this->suprimeBloco('TRIBUTAÇÃO MUNICIPAL (ISSQN) - OPERAÇÃO NÃO SUJEITA AO ISSQN', 'issqn');
 
             return;
         }
@@ -843,20 +843,36 @@ class LayoutV2 implements LayoutDanfseInterface
      * caber numa página só.
      *
      * @param string $frase
-     * @param string $bloco       Chave de {@see self::Y}
-     * @param float  $alturaCheia Altura que o bloco teria com dados (cm)
+     * @param string $bloco Chave de {@see self::Y}
      *
      * @return void
      */
-    private function suprimeBloco($frase, $bloco, $alturaCheia)
+    private function suprimeBloco($frase, $bloco)
     {
         $this->faixaTexto($frase, $this->y($bloco), self::ALTURA_SUPRIMIDO);
 
-        // O bloco ocuparia $alturaCheia + a faixa de título; passa a ocupar a
-        // altura mínima da nota 2. O desconto usa EXATAMENTE a mesma altura que
-        // foi desenhada: qualquer diferença entre as duas vira faixa em branco
-        // (ou sobreposição) entre este bloco e o seguinte.
-        $this->deslocamento -= ($alturaCheia + self::ALTURA_TITULO) - self::ALTURA_SUPRIMIDO;
+        // O bloco ocuparia do seu Y até o Y do bloco seguinte (a faixa de título
+        // já está DENTRO dessa distância); passa a ocupar só a faixa da nota 2.
+        // A altura vem da própria tabela Y: antes era passada à mão e somava o
+        // título de novo — com o tomador suprimido, o destinatário subia para
+        // cima da faixa do tomador e as duas frases saíam sobrepostas.
+        $this->deslocamento -= $this->alturaDoBloco($bloco) - self::ALTURA_SUPRIMIDO;
+    }
+
+    /**
+     * Altura cheia de um bloco (cm): a distância até o bloco seguinte em
+     * {@see self::Y}.
+     *
+     * @param string $bloco
+     *
+     * @return float
+     */
+    private function alturaDoBloco($bloco)
+    {
+        $chaves = array_keys(self::Y);
+        $indice = array_search($bloco, $chaves, true);
+
+        return self::Y[$chaves[$indice + 1]] - self::Y[$bloco];
     }
 
     /*

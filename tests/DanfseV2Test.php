@@ -6,6 +6,7 @@ namespace QuantumTecnology\NfseNacional\Tests;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use QuantumTecnology\NfseNacional\Danfse;
 use QuantumTecnology\NfseNacional\Danfse\AbstractDanfse;
 use QuantumTecnology\NfseNacional\DanfseSimples;
 use Smalot\PdfParser\Parser;
@@ -339,6 +340,65 @@ endstream#s', $pdf, $fluxos);
             [4, 6],
             'PNG com canal alfa: o FPDF não desenha, e a logo some em silêncio.',
         );
+    }
+
+    #[Test]
+    public function distribuiALogomarcaJaCompostaSobreOCinzaDoCabecalho(): void
+    {
+        // O cabeçalho do v2 é cinza 5% (RGB 242). Com a logo de fundo branco,
+        // a faixa dela destoava do resto do cabeçalho; a versão do v2 é a marca
+        // oficial transparente achatada sobre esse cinza exato.
+        $logo = __DIR__ . '/../imgs/nfse_logo_cinza5.png';
+
+        $this->assertFileExists($logo);
+        $this->assertNotContains(
+            ord(file_get_contents($logo, false, null, 25, 1)),
+            [4, 6],
+            'PNG com canal alfa: o FPDF não desenha, e a logo some em silêncio.',
+        );
+
+        if (!extension_loaded('gd')) {
+            $this->markTestIncomplete('Sem GD não dá para conferir a cor do fundo.');
+        }
+
+        $imagem = imagecreatefrompng($logo);
+        $canto  = imagecolorsforindex($imagem, imagecolorat($imagem, imagesx($imagem) - 1, 0));
+
+        $this->assertSame(
+            [242, 242, 242],
+            [$canto['red'], $canto['green'], $canto['blue']],
+            'O fundo da logo tem de ser o CINZA_5 do LayoutV2, senão a faixa volta a destoar.',
+        );
+    }
+
+    #[Test]
+    public function soAMarcaOficialRecebeOFundoCinzaPorBaixo(): void
+    {
+        $xml = $this->xml('nfse_autorizada_uberlandia.xml');
+
+        // Marca em texto não pinta fundo; a oficial tem versão no cinza.
+        $this->assertTrue((new DanfseSimples($xml))->marcaAceitaFundoCinza());
+        $this->assertTrue((new Danfse($xml))->marcaAceitaFundoCinza());
+
+        // A do integrador traz fundo próprio: a faixa dela continua branca.
+        $personalizada = __DIR__ . '/../imgs/nfse_logo.png';
+        $this->assertFalse((new Danfse($xml))->marcaAceitaFundoCinza($personalizada));
+    }
+
+    #[Test]
+    public function oV2DesenhaALogoEmImagemENaoCaiNoTexto(): void
+    {
+        $nivelAnterior = error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
+
+        try {
+            $pdf = (new Danfse($this->xml('nfse_autorizada_uberlandia.xml')))->render();
+        } finally {
+            error_reporting($nivelAnterior);
+        }
+
+        // A logo (1920 px de largura) só entra no PDF como imagem se o FPDF
+        // conseguiu ler o arquivo; o fallback em texto não gera XObject.
+        $this->assertStringContainsString('/Width 1920', $pdf);
     }
 
     #[Test]

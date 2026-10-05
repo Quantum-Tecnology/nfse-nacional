@@ -226,12 +226,15 @@ class LayoutV2 implements LayoutDanfseInterface
         $infNfse = $this->dados['infNfse'];
         $y       = self::Y['cabecalho'];
 
-        // Fundo cinza 5% do cabeçalho (item 2.2.3), pintado À DIREITA da
-        // logomarca. O FPDF não suporta PNG com transparência, então a marca é
-        // uma imagem de fundo branco: pintar o cinza sob ela deixaria um
-        // retângulo branco visível em volta. A faixa da logo fica branca, como
-        // no modelo do Anexo I.
-        $inicioDoCinza = 4.60; // fim da caixa da logomarca (0,49 + 4,00) + folga
+        // Fundo cinza 5% do cabeçalho (item 2.2.3). Com a marca oficial (ou em
+        // texto), o cinza cobre o cabeçalho inteiro: o pacote traz a logo já
+        // composta sobre esse cinza, porque o FPDF não desenha PNG com
+        // transparência. Com a logo do integrador, que tem fundo próprio, o
+        // cinza começa À DIREITA dela — pintar por baixo deixaria um retângulo
+        // destacado em volta.
+        $inicioDoCinza = $this->danfse->marcaAceitaFundoCinza($logo)
+            ? self::X0
+            : 4.60; // fim da caixa da logomarca (0,49 + 4,00) + folga
 
         $this->pdf->setFillColor(self::CINZA_5, self::CINZA_5, self::CINZA_5);
         $this->pdf->rect(

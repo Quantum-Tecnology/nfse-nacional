@@ -838,6 +838,21 @@ abstract class AbstractDanfse extends DaCommon
     }
 
     /**
+     * A marca pode ficar sobre o fundo cinza do cabeçalho do v2?
+     *
+     * A marca em texto não pinta fundo, então combina com qualquer cor. A
+     * subclasse que desenha imagem responde false quando o arquivo traria um
+     * fundo próprio (ver Danfse).
+     *
+     * @param string|null $logo Logo informado em render($logo)
+     * @return bool
+     */
+    public function marcaAceitaFundoCinza($logo = null)
+    {
+        return true;
+    }
+
+    /**
      * Desenha o QR Code de consulta pública na posição exigida pelo layout.
      *
      * @param float $x    Em mm

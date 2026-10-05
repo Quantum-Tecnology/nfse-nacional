@@ -8,6 +8,13 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o 
 
 > **Nota sobre o histórico.** Este arquivo começa na `3.3.0`. As versões anteriores (24 tags, de `1.0.0` a `3.2.4`) não tinham changelog escrito e não serão reconstruídas a partir do log do Git.
 
+## [3.4.4] — 2026-10-05
+
+### Alterado
+
+- **DANFSe v2.0: o cinza do cabeçalho passa a correr por baixo da logomarca.** A logo de fundo branco deixava um retângulo branco destacado no canto do cabeçalho cinza 5%. O pacote agora traz `imgs/nfse_logo_cinza5.png`, que é a marca oficial transparente (do site da NFS-e Nacional) achatada sobre o cinza exato do cabeçalho (RGB 242, o `CINZA_5` do `LayoutV2`). No PDF o efeito é igual ao de uma imagem transparente, e o arquivo continua sem canal alfa, que o FPDF não desenha. O v1, de fundo branco, continua usando `nfse_logo.png`.
+- **Logo do integrador** (`render($logo)` ou `$logomarca`) mantém a faixa branca de antes: é um arquivo opaco de fundo desconhecido, e o cinza por baixo viraria um retângulo em volta dela. A decisão fica em `AbstractDanfse::marcaAceitaFundoCinza()`.
+
 ## [3.4.3] — 2026-09-28
 
 ### Corrigido

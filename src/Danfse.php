@@ -35,12 +35,23 @@ class Danfse extends AbstractDanfse
     protected $logoNfse = 'imgs/nfse_logo.png';
 
     /**
+     * A mesma logo, achatada sobre o cinza 5% (RGB 242) do cabeçalho do v2.
+     *
+     * O FPDF não desenha PNG com transparência, então "transparente" aqui é a
+     * marca oficial composta sobre a cor exata do fundo em que ela vai ficar.
+     * Sem alfa no arquivo, e sem a caixa branca em volta.
+     * @var string
+     */
+    protected $logoNfseSobreCinza = 'imgs/nfse_logo_cinza5.png';
+
+    /**
      * Marca da NFS-e: imagem quando disponível, texto como alternativa.
      *
      * Sem caixa informada (layout v1), a marca é desenhada com a altura fixa
-     * histórica, a 2mm da origem. Com caixa (layout v2), ela é ajustada para
-     * caber exatamente no espaço que a NT reserva à logomarca, sem distorcer a
-     * proporção do arquivo.
+     * histórica, a 2mm da origem, e usa a logo de fundo branco. Com caixa
+     * (layout v2), ela é ajustada para caber exatamente no espaço que a NT
+     * reserva à logomarca, sem distorcer a proporção do arquivo, e usa a logo
+     * de fundo cinza 5% — a cor do cabeçalho do v2.
      *
      * @param float       $x
      * @param float       $y
@@ -51,7 +62,7 @@ class Danfse extends AbstractDanfse
      */
     protected function renderMarcaNfse($x, $y, $logo = null, $largura = null, $altura = null)
     {
-        $arquivo = $this->resolveLogo($logo);
+        $arquivo = $this->resolveLogo($logo, null !== $largura && null !== $altura);
 
         if (null === $arquivo) {
             // Sem imagem utilizável, cai no desenho em texto: um cabeçalho sem
@@ -140,17 +151,49 @@ class Danfse extends AbstractDanfse
      * Caminho utilizável da logo: a informada, senão a padrão do pacote.
      *
      * @param string|null $logo
+     * @param bool        $sobreCinza A marca vai sobre o cabeçalho cinza (v2)
      * @return string|null
      */
-    private function resolveLogo($logo)
+    private function resolveLogo($logo, $sobreCinza = false)
     {
-        foreach ([$logo, $this->logomarca, __DIR__ . '/../' . $this->logoNfse] as $candidato) {
+        $padrao = __DIR__ . '/../' . ($sobreCinza ? $this->logoNfseSobreCinza : $this->logoNfse);
+
+        foreach ([$this->logoPersonalizada($logo), $padrao] as $candidato) {
+            if (null !== $candidato && is_file($candidato)) {
+                return $candidato;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Logo do integrador (render($logo) ou $logomarca), se houver arquivo.
+     *
+     * @param string|null $logo
+     * @return string|null
+     */
+    private function logoPersonalizada($logo)
+    {
+        foreach ([$logo, $this->logomarca] as $candidato) {
             if (is_string($candidato) && '' !== $candidato && is_file($candidato)) {
                 return $candidato;
             }
         }
 
         return null;
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * A logo do integrador é um arquivo opaco de fundo desconhecido (quase
+     * sempre branco): sobre o cinza viraria um retângulo destacado. A oficial
+     * do pacote tem uma versão no cinza exato do cabeçalho.
+     */
+    public function marcaAceitaFundoCinza($logo = null)
+    {
+        return null === $this->logoPersonalizada($logo);
     }
 
     /**

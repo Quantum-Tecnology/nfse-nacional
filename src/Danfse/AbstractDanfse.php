@@ -588,7 +588,7 @@ abstract class AbstractDanfse extends DaCommon
      * Ler o do DPS achando que são os valores devolve tudo zerado — foi
      * exatamente esse tipo de troca que zerava o ISSQN antes.
      *
-     * Obrigatório a partir de 01/08/2026 (Dps::IBSCBS_OBRIGATORIO_EM) e, para
+     * Obrigatório a partir de 01/10/2026 (Dps::IBSCBS_OBRIGATORIO_EM) e, para
      * o Simples Nacional, 01/01/2027.
      *
      * @param array $infNfse
@@ -2193,14 +2193,18 @@ abstract class AbstractDanfse extends DaCommon
 
     /**
      * Formata CNPJ/CPF
-     * 
+     *
+     * CNPJ alfanumérico (a partir de julho/2026): letras na raiz e na ordem,
+     * dígitos verificadores numéricos. A máscara é a mesma — só não se pode
+     * descartar as letras ao limpar a pontuação.
+     *
      * @param string $doc
      * @return string
      */
     protected function formatarCnpjCpf($doc)
     {
-        $doc = preg_replace('/[^0-9]/', '', $doc);
-        
+        $doc = strtoupper((string) preg_replace('/[^0-9A-Za-z]/', '', (string) $doc));
+
         if (strlen($doc) == 14) {
             // CNPJ: 00.000.000/0000-00
             return substr($doc, 0, 2) . '.' . 

@@ -30,11 +30,16 @@ class SchemaValidator
     /**
      * Caminho do XSD de um documento numa dada versão.
      *
+     * Uma pasta por versão, como no pacote oficial (Schemas/1.00, Schemas/1.01):
+     * as duas versões trazem arquivos de mesmo nome e conteúdo diferente
+     * (CNC_v1.00, tiposCnc_v1.00, xmldsig-core-schema), que numa pasta só se
+     * sobrescreveriam.
+     *
      * @param string $documento Nome do XSD sem versão: 'DPS', 'pedRegEvento', 'NFSe'
      */
     public static function schemaPath(string $documento, string $versao = '1.01'): string
     {
-        return self::pathSchemes() . $documento . '_v' . $versao . '.xsd';
+        return self::pathSchemes() . $versao . '/' . $documento . '_v' . $versao . '.xsd';
     }
 
     /**

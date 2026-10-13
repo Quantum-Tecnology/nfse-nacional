@@ -13,7 +13,7 @@ Além de tudo que já existia no pacote original, esta versão adiciona:
 ### 🏛️ Destaque de IBS/CBS (Reforma Tributária — EC 132/2023)
 O grupo `<IBSCBS>` do DPS é gerado a partir de `$std->infDPS->IBSCBS`.
 
-> 🚨 **A partir de 01/08/2026 este grupo é obrigatório** — sem ele a NFS-e é rejeitada na recepção. No pacote ele continua sendo emitido apenas quando presente no payload (sem o campo, o XML sai como antes), então **a responsabilidade de preenchê-lo é de quem integra**. Veja o [calendário](#-calendário-da-reforma--o-que-entra-e-o-que-sai-e-quando).
+> 🚨 **A partir da competência 01/10/2026 este grupo é obrigatório** para os serviços em geral (01/12/2026 para plataformas, locações, condomínios e bens imateriais; 01/01/2027 para o Simples Nacional) — sem ele a NFS-e é rejeitada na recepção. No pacote ele continua sendo emitido apenas quando presente no payload (sem o campo, o XML sai como antes), então **a responsabilidade de preenchê-lo é de quem integra**. Veja o [calendário](#-calendário-da-reforma--o-que-entra-e-o-que-sai-e-quando).
 
 No DPS você **apenas declara a situação tributária** — `CST` e `cClassTrib`. As alíquotas e os valores de IBS/CBS são calculados pelo Ambiente de Dados Nacional e voltam no `<infNFSe>` da NFS-e autorizada; **não envie valores**.
 
@@ -38,33 +38,79 @@ Grupos opcionais suportados: `tpOper`, `gRefNFSe` (até 99 chaves), `tpEnteGov`,
 
 > ⚠️ **Os códigos são strings, nunca inteiros.** `CST`, `cClassTrib`, `cIndOp` e `cCredPres` têm zero à esquerda significativo — um cast para `int` transforma `'000001'` em `1` e a nota é rejeitada.
 
-#### 📅 Calendário da Reforma — o que entra e o que sai, e quando
+#### 📅 Calendário — o que já vale e o que vem
 
-| Data | O que muda | Impacto em quem emite |
+Situação em **13/10/2026**. Os itens com ⏳ ainda não estão em vigor.
+
+| Data | O que muda | Impacto em quem emite | Fonte |
+|---|---|---|---|
+| ✅ **05/01/2026** | Leiaute RTC (grupo `<IBSCBS>`) entra em produção, **opcional** | Já dá para destacar IBS/CBS | NT 004 v2.0 |
+| ✅ **03/08/2026** | **API de geração do DANFSe do ADN suspensa**; DANFSe v2.0 na Consulta Pública | O PDF passa a ser gerado localmente, ver [DANFSe local](#-danfse-local-sem-depender-do-adn) | NT 008 v1.02 |
+| ✅ **10/08/2026** | **CNPJ alfanumérico em produção** na Sefin Nacional | Pacote aceita desde a 3.5.0, ver [CNPJ alfanumérico](#-cnpj-alfanumérico) | [Notícia do portal NFS-e](https://www.gov.br/nfse/pt-br/noticias/plataforma-nfs-e-disponibiliza-novas-evolucoes-em-producao-restrita-e-divulga-cronograma-de-implantacao) |
+| ✅ **01/10/2026** | Grupo `<IBSCBS>` **obrigatório** para os serviços em geral | 🚨 **Emissão sem o grupo é rejeitada.** O pacote avisa com `E_USER_WARNING` (`Dps::IBSCBS_OBRIGATORIO_EM`) | Ato Conjunto RFB/CGIBS nº 4 |
+| ✅ **01/10/2026** | `tpRetPisCofins` **deixa de aceitar `1` e `2`** | Use `0` ou os códigos `3` a `9` (já no XSD) | NT 007 · Anexo VI v1.04.01 |
+| ⏳ **01/11/2026** | ME/EPP do Simples Nacional **obrigadas** a emitir NFS-e de padrão nacional | Quem ainda emite no padrão municipal migra | Resolução CGSN nº 191 |
+| ⏳ **01/12/2026** | `<IBSCBS>` obrigatório para **plataformas digitais, locações (bens móveis e imóveis), condomínios, bens imateriais** e itens 1.03, 1.05, 1.09 e 16.01 da LC 116 | Esses segmentos ganham dois meses a mais | Ato Conjunto RFB/CGIBS nº 4 |
+| ⏳ **01/01/2027** | `<IBSCBS>` obrigatório **também para o Simples Nacional** (até lá, dispensado) | Emissores do Simples precisam preencher o grupo | Ato Conjunto RFB/CGIBS nº 4 · Anexo VI |
+| ⏳ **01/01/2027** | IBS/CBS cobrados **"por fora"**: `vTotNF = vLiq + vCBS + vIBSTot` (em 2026 é só `vLiq`) | Muda o valor total da nota — atenção a conciliação e integrações | Anexo VI v1.04.01 |
+| ⏳ **01/01/2027** | PIS/COFINS saem da base do IBS/CBS: `vBC` deixa de subtrair `vPIS`/`vCOFINS` | Base de cálculo aumenta | Anexo VI v1.04.01 |
+| ⏳ **a definir** | Leiaute da **NT 009** (notas de ajuste, Simples Nacional, `gPgtoVinc`…) | A NT diz que o cronograma "será publicado no portal". Até 13/10 não saiu | NT 009 v1.01 |
+| ⏳ **até 2032** | Transição da EC 132/2023 | Convivência dos dois regimes | EC 132/2023 |
+
+> ⚠️ **As datas da Reforma já mudaram mais de uma vez.** A obrigatoriedade do `<IBSCBS>` era 01/08/2026 e foi para 01/10/2026 com a NT 009 v1.01 e o Ato Conjunto nº 4. Confirme sempre no [portal da NFS-e](https://www.gov.br/nfse/pt-br/biblioteca/documentacao-tecnica).
+
+#### 🔭 Previsto no leiaute v1.04, ainda não implementado
+
+Estes campos estão no Anexo VI v1.04.01, que consolida as NT 005, 007 e 009, mas **não** nos XSDs oficiais publicados (nem no de produção, nem no de produção restrita de 27/07/2026). Entram no pacote quando o schema sair: implementar só pelo PDF da NT é chute, e o leiaute ainda muda (a NT 009 tem regras "tachadas, em evolução").
+
+| Campo / grupo | Para quê | NT |
 |---|---|---|
-| **01/08/2026** | O grupo `<IBSCBS>` **passa a ser obrigatório** para autorização/recepção da NFS-e | 🚨 **Emissão sem o grupo é rejeitada.** Quem hoje não preenche `$std->infDPS->IBSCBS` para de emitir |
-| **01/08/2026** | `tpRetPisCofins` **deixa de aceitar os valores `1` e `2`** | Use os códigos novos (`3` a `9`) ou `0` |
-| **01/01/2027** | `IBSCBS` passa a ser obrigatório **também para optantes do Simples Nacional** (até lá, dispensados) | Emissores do Simples precisam preencher o grupo |
-| **01/01/2027** | IBS/CBS passam a ser cobrados **"por fora"**: `vTotNF = vLiq + vCBS + vIBSTot` (em 2026 é só `vLiq`) | Muda o valor total da nota — atenção a conciliação e integrações |
-| **01/01/2027** | PIS/COFINS saem da base do IBS/CBS: `vBC` deixa de subtrair `vPIS`/`vCOFINS` | Base de cálculo aumenta |
-| **até 2032** | Período de transição da EC 132/2023 | Convivência dos dois regimes |
+| `indZFMALC` | Zona Franca de Manaus / ALC — alíquota zero de CBS | 007 |
+| `indDoacao` + `gEstornoCred` | operação de doação e estorno dos créditos de entrada | 005 |
+| `gPagAntecipado` | referência a NFS-e de pagamento antecipado | 005 |
+| `gIBSCBSAjuste`, `tpNFSeDebito`, `tpNFSeCredito` | notas de ajuste de crédito e débito (`vIBS`, `vCBS`) | 009 (2.2) |
+| `vAjusteBC` | une `vDedRed` e `gReeRepRes` num grupo só | 009 (2.3) |
+| `regApIBSCBSSN`, `cAtvSN`, `opSimpNac = 4` | regime de apuração de IBS/CBS no Simples, atividade do Simples, "optante pendente" | 009 (2.4) |
+| `bensMoveis` | locação de bens móveis (era `gLocBensMoveis`) | 009 (2.7) |
+| `gPgtoVinc` | vinculação com até 99 transações de pagamento (PIX, cartão) | 009 (2.8) |
+| `vAjusteBCIBSCBSComExt` e o grupo `comExt` | operações com o exterior | 009 (2.12–2.13) |
+| grupo de condomínios | operações de condomínio | 009 (2.15) |
 
-> As datas acima constam do **Anexo VI da NT SE/CGNFS-e nº 009** (leiaute RTC IBS/CBS v1.04) e da **NT SE/CGNFS-e nº 007**, de 07/02/2026. Confirme sempre no [portal da NFS-e](https://www.nfse.gov.br/) — o cronograma da Reforma vem sendo ajustado.
+Pontos que **mudam estrutura** e por isso aguardam os novos schemas: `finNFSe` sai de `IBSCBS/finNFSe` e vai para `infDPS/finNFSe` (`0` regular, `1` crédito, `2` débito); `indDest`/`dest` sobem para `infDPS` (2.11); `CST`/`cClassTrib` são reposicionados (2.16); `indFinal` é reinserido (2.5); e o grupo `imovel` é redesenhado em `cMun` + `gLocacao` + `gUnidImob` (2.6). O `verCalcIBSCBS` (2.9) só aparece na NFS-e devolvida, não no DPS.
 
-#### 🔭 Já previsto na NT 009, ainda não implementado
+### 📋 Conformidade com as Notas Técnicas
 
-Estes campos existem no leiaute v1.04 mas **não** nos XSDs v1.01 que o pacote empacota. Serão adicionados quando os schemas v1.04 forem publicados:
+| NT | Versão / data | Assunto | No pacote |
+|---|---|---|---|
+| **004** | v2.0 · 10/12/2025 | Leiaute RTC (grupos IBS/CBS) | ✅ Grupo `<IBSCBS>` desde a 3.x |
+| **005** | v1.1 · 19/11/2025 | Evoluções do leiaute RTC | ⏳ Consolidada no v1.04; aguarda XSD |
+| **007** | v1.0 · 07/02/2026 | Novos códigos de `tpRetPisCofins`, PIS/COFINS fora da base | 🟡 Códigos aceitos (XSD v1.01); `indZFMALC` aguarda XSD |
+| **008** | v1.02 · 14/07/2026 | DANFSe v2.0 e suspensão da API do ADN | ✅ Layout v2.0 padrão desde a 3.4 |
+| **009** | v1.01 · 11/09/2026 | CNPJ alfanumérico, notas de ajuste, Simples, `gPgtoVinc`… | 🟡 CNPJ alfanumérico na 3.5.0; o resto aguarda XSD e cronograma |
+| **010** | v1.00 · 11/09/2026 | NFS-e Via e evento de manifestação do adquirente | ➖ Fora do escopo (NFS-e Via) |
 
-| Campo / grupo | Para quê |
-|---|---|
-| `indZFMALC` | Zona Franca de Manaus / ALC — alíquota zero de CBS |
-| `indDoacao` + `gEstornoCred` | operação de doação e estorno dos créditos de entrada |
-| `gIBSCBSAjuste` | notas de ajuste (`vIBS`, `vCBS`) |
-| `gPagAntecipado` | referência a NFS-e de pagamento antecipado |
-| `gPgtoVinc` | vinculação com a transação de pagamento (PIX, cartão) |
-| `bensMoveis` | locação de bens móveis (`cTribNac` 99.04.01) |
+As NT 001 a 003 foram consolidadas pelas seguintes, e a NT 006 trata só da NFS-e Via.
 
-Dois pontos **mudam estrutura** e por isso aguardam os novos schemas: `finNFSe` migra de `IBSCBS/finNFSe` para `infDPS/finNFSe` (passando a aceitar `0` regular, `1` crédito e `2` débito), e o grupo `imovel` é redesenhado em `cMun` + `gLocacao` + `gUnidImob`.
+### 🔤 CNPJ alfanumérico
+Desde **10/08/2026** a Sefin Nacional aceita o CNPJ alfanumérico (IN RFB nº 2.229/2024; NT 009, item 2.1): 12 posições `[A-Z0-9]` + 2 dígitos verificadores numéricos, como em `12.ABC.345/01DE-35`. O CNPJ numérico continua válido.
+
+A partir da 3.5.0 o pacote aceita esse formato em todo lugar onde há CNPJ:
+
+- **Campos** `CNPJ` do prestador, tomador, intermediário, destinatário, fornecedor e autor do evento (`TSCNPJ` = `[0-9A-Z]{14}` no XSD);
+- **Identificadores**: `Id` da DPS, chave da NFS-e e `Id` do pedido de evento carregam a inscrição do emitente e, portanto, as letras;
+- **DANFSe**: o documento sai formatado com as letras (`12.ABC.345/01DE-35`).
+
+> ⚠️ **Não limpe CNPJ nem chave com `\D`** (`preg_replace('/\D/', '', ...)`): isso apaga as letras e gera um documento que não existe, ou que casa com outra empresa. Use `[^A-Z0-9]` sobre o valor em maiúsculas:
+>
+> ```php
+> $cnpj = preg_replace('/[^A-Z0-9]/', '', strtoupper($cnpj));
+> ```
+>
+> Para CPF, CEP e telefone o `\D` continua certo.
+
+> O pacote **não confere o dígito verificador**: o XSD só valida o formato. Valide o DV no seu cadastro. O cálculo é módulo 11 sobre o valor ASCII de cada caractere menos 48, então a mesma conta vale para o CNPJ numérico.
+
+> 🧩 **O XSD oficial se contradiz sobre onde a letra cabe na chave.** O `TSChaveNFSe` aceita letras nas posições 7 a 20 da chave, e o `Id` do evento aceita na inscrição, posições 10 a 23. Um CNPJ com letra no 12º caractere (o último da ordem) passa num e é recusado no outro. O pacote segue o XSD como publicado.
 
 ### 🧭 Roteamento inteligente por município (emissão × cancelamento × consulta)
 Municípios com **emissor próprio** (ex.: **Americana-SP**) aceitam o leiaute nacional, mas num endpoint específico da prefeitura — enquanto as **consultas** continuam no Ambiente Nacional (ADN/SEFIN).
@@ -155,7 +201,7 @@ O namespace passou a ser **`QuantumTecnology\NfseNacional`**, alinhado aos demai
 > ⚠️ **Breaking change** ao migrar de versões anteriores: troque os `use Hadder\NfseNacional\...` por `use QuantumTecnology\NfseNacional\...`.
 
 ### 🔁 Eventos: cancelamento e cancelamento por substituição
-O `renderEvento()` **nunca gerou XML válido** em versões anteriores: faltava o elemento obrigatório `<nPedRegEvento>` e o atributo `Id` tinha 59 caracteres onde o schema exige 62. Na prática, **nenhum cancelamento era aceito** pelo Ambiente Nacional. Corrigido.
+O pedido de registro de evento segue o XSD oficial v1.01: **sem** `<nPedRegEvento>` (o grupo do evento vem logo depois do `chNFSe`) e `Id` de 59 caracteres — `"PRE"` + chave (50) + tipo do evento (6). Ver a 3.5.0 no CHANGELOG: até ela, o pacote validava contra uma edição antiga do XSD e gerava o elemento.
 
 Além do `e101101` (cancelamento), agora também é gerado o corpo do **`e105102`** (cancelamento por substituição), que antes tinha o código mapeado mas produzia um `infPedReg` sem o grupo do evento.
 
@@ -172,7 +218,7 @@ $std->infPedReg->e105102 = (object) [
 ];
 ```
 
-O `xDesc` **não precisa ser informado** — é enumeração de valor fixo no schema e o pacote o deriva do próprio evento (a grafia do 105102, por exemplo, não leva cedilha). O `nPedRegEvento` assume `1` por padrão; informe-o em `$std->infPedReg->nPedRegEvento` nos eventos que podem se repetir.
+O `xDesc` **não precisa ser informado** — é enumeração de valor fixo no schema e o pacote o deriva do próprio evento e da versão do documento (a grafia do 105102 é acentuada na v1.01 e sem acento na v1.00).
 
 ### 🛡️ Compatibilidade de versão do PHP
 `generateId()` e o cliente HTTP usavam `mb_str_pad()` e `mb_trim()`, **funções exclusivas do PHP 8.4**, enquanto o pacote declara `^8.1`. Em PHP 8.1–8.3 a instalação passava sem aviso e o pacote quebrava na primeira emissão. Trocadas por `str_pad()`/`trim()`.
@@ -244,7 +290,11 @@ O `consultarDanfse()` continua no pacote para quem ainda o usa contra endpoint d
 3. **Não repita em caso de exceção** (certificado, config, rede): é falha dura;
 4. **Caia para a geração local** a partir do XML.
 
-> 🔑 A chave precisa ser **numérica, 50 dígitos**. A SEFAZ devolve `chaveAcesso` com o prefixo `NFS` (decoração do `Id` do XML) e, com ele, a consulta volta **vazia sem erro** — um dos enganos mais comuns. Limpe com `preg_replace('/\D/', '', $chave)`.
+> 🔑 A chave tem **50 posições**. A SEFAZ devolve `chaveAcesso` com o prefixo `NFS` (decoração do `Id` do XML) e, com ele, a consulta volta **vazia sem erro** — um dos enganos mais comuns. Tire o prefixo e a pontuação **sem apagar letras**, porque a chave de emitente com [CNPJ alfanumérico](#-cnpj-alfanumérico) tem letras:
+>
+> ```php
+> $chave = preg_replace('/[^A-Z0-9]/', '', strtoupper(preg_replace('/^NFS/i', '', $chave)));
+> ```
 
 A implementação completa está em [GeraDanfseLocal.php](examples/GeraDanfseLocal.php).
 

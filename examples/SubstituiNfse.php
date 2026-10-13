@@ -44,9 +44,6 @@ try {
     // Chave da NFS-e que está sendo substituída (50 dígitos)
     $std->infPedReg->chNFSe = '00000000000000000000000000000000000000000000000000';
 
-    // Só informe se este tipo de evento já ocorreu antes para a mesma nota.
-    // $std->infPedReg->nPedRegEvento = 2;
-
     $std->infPedReg->e105102               = new stdClass();
     $std->infPedReg->e105102->cMotivo      = '01'; // 01..05, 99 — com zero à esquerda
     $std->infPedReg->e105102->xMotivo      = 'Substituicao por erro de valor'; // opcional

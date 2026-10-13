@@ -416,6 +416,18 @@ endstream#s', $pdf, $fluxos);
     }
 
     #[Test]
+    public function formataCnpjAlfanumericoSemPerderAsLetras(): void
+    {
+        // Antes a limpeza era [^0-9]: "12ABC34501DE35" virava "123450135" e o
+        // DANFSe imprimia um documento que não é o do emitente.
+        $danfse = new DanfseSimples($this->xml('nfse_autorizada_americana_sem_ibscbs.xml'));
+
+        $this->assertSame('12.ABC.345/01DE-35', $danfse->formatarDocumentoNoLayout('12.abc.345/01de-35'));
+        $this->assertSame('11.222.333/0001-81', $danfse->formatarDocumentoNoLayout('11222333000181'));
+        $this->assertSame('123.456.789-09', $danfse->formatarDocumentoNoLayout('12345678909'));
+    }
+
+    #[Test]
     public function informaOAmbienteGeradorEOTipoDeAmbiente(): void
     {
         // São campos distintos no modelo (item 2.4.5): ambGer diz QUEM gerou;

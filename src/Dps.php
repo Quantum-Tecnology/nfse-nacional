@@ -21,10 +21,12 @@ class Dps implements DpsInterface
     /**
      * Data em que o grupo IBSCBS passa a ser obrigatório na recepção da NFS-e.
      *
-     * NT SE/CGNFS-e nº 007 (07/02/2026) e Anexo VI da NT 009. A partir desta
-     * competência a SEFAZ rejeita DPS sem o grupo.
+     * Ato Conjunto RFB/CGIBS nº 4, de 30/07/2026 (serviços em geral), e Anexo VI
+     * v1.04.01 da NT 009 v1.01. Era 01/08/2026 até a NT 009 v1.01. Plataformas,
+     * locações, condomínios e bens imateriais só a partir de 01/12/2026 — o
+     * pacote não sabe o segmento do emitente, então avisa pela data mais cedo.
      */
-    public const IBSCBS_OBRIGATORIO_EM = '2026-08-01';
+    public const IBSCBS_OBRIGATORIO_EM = '2026-10-01';
 
     /**
      * Competência a partir da qual o IBSCBS também vale para o Simples Nacional.

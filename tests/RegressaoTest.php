@@ -136,10 +136,11 @@ final class RegressaoTest extends TestCase
 
     /*
     |--------------------------------------------------------------------------
-    | Vigência: IBSCBS obrigatório desde 01/08/2026
+    | Vigência: IBSCBS obrigatório desde 01/10/2026
     |--------------------------------------------------------------------------
     |
-    | A partir dessa competência a SEFAZ rejeita DPS sem o grupo. O pacote avisa
+    | Ato Conjunto RFB/CGIBS nº 4 (era 01/08 até a NT 009 v1.01). A partir dessa
+    | competência a SEFAZ rejeita DPS sem o grupo. O pacote avisa
     | (E_USER_WARNING) em vez de lançar: não sabe se o emitente é optante do
     | Simples, dispensado até 2027.
     */
@@ -149,13 +150,13 @@ final class RegressaoTest extends TestCase
     {
         $std = $this->stdBase();
 
-        $std->infDPS->dCompet = '2026-08-01';
+        $std->infDPS->dCompet = '2026-10-01';
 
         $avisos = $this->capturaAvisos(fn () => (new Dps($std))->render());
 
         $this->assertCount(1, $avisos, 'Deveria avisar sobre o IBSCBS ausente.');
         $this->assertStringContainsString('IBSCBS', $avisos[0]);
-        $this->assertStringContainsString('2026-08-01', $avisos[0]);
+        $this->assertStringContainsString('2026-10-01', $avisos[0]);
     }
 
     #[Test]
@@ -163,7 +164,8 @@ final class RegressaoTest extends TestCase
     {
         $std = $this->stdBase();
 
-        $std->infDPS->dCompet = '2026-07-31';
+        // Agosto e setembro avisavam com a data antiga (01/08).
+        $std->infDPS->dCompet = '2026-09-30';
 
         $this->assertSame([], $this->capturaAvisos(fn () => (new Dps($std))->render()));
     }

@@ -588,7 +588,7 @@ abstract class AbstractDanfse extends DaCommon
      * Ler o do DPS achando que são os valores devolve tudo zerado — foi
      * exatamente esse tipo de troca que zerava o ISSQN antes.
      *
-     * Obrigatório a partir de 01/08/2026 (Dps::IBSCBS_OBRIGATORIO_EM) e, para
+     * Obrigatório a partir de 01/10/2026 (Dps::IBSCBS_OBRIGATORIO_EM) e, para
      * o Simples Nacional, 01/01/2027.
      *
      * @param array $infNfse

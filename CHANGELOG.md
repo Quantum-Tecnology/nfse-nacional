@@ -21,10 +21,16 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o 
 - **Cancelamento passava na validação local e era recusado pela Sefin Nacional.** A edição antiga exigia `<nPedRegEvento>` e `Id` de 62 caracteres. A 3.x (commit `188f3ac`) passou a gerá-los para "passar no XSD", desfazendo a correção do upstream de jan/2026. O XSD oficial não tem o elemento e limita o `Id` a 59.
 - **`xDesc` do cancelamento por substituição (e105102)** passou a ser "Cancelamento de NFS-e por Substituição", com acento, como na v1.01 oficial. Na v1.00 continua sem acento.
 - **DANFSe apagava as letras do CNPJ alfanumérico** ao formatar o documento: `12ABC34501DE35` saía como `123450135`.
+- **`Dps::IBSCBS_OBRIGATORIO_EM` passa de `2026-08-01` para `2026-10-01`**, a data do Ato Conjunto RFB/CGIBS nº 4 e do Anexo VI v1.04.01 da NT 009 v1.01. Antes, DPS sem `<IBSCBS>` com competência de agosto ou setembro gerava um aviso indevido.
+- **O README e o exemplo `GeraDanfseLocal.php` mandavam limpar a chave com `\D`**, o que apaga as letras de uma chave com CNPJ alfanumérico. Agora a limpeza é com `[^A-Z0-9]`.
+
+### Documentação
+
+- README ganhou três seções: **CNPJ alfanumérico**, **Conformidade com as Notas Técnicas** (NT 004 a 010, com o estado de cada uma no pacote) e o **calendário revisado**, com o que já vale e o que vem até 2027, cada item com a fonte (Ato Conjunto RFB/CGIBS nº 4, Resolução CGSN nº 191, NTs). A lista "previsto no leiaute v1.04" agora indica a NT de cada campo e inclui os da NT 009 que faltavam (`regApIBSCBSSN`, `cAtvSN`, `vAjusteBC`, notas de ajuste, `comExt`, condomínios).
 
 ### Adicionado
 
-- **CNPJ alfanumérico** em todos os campos de CNPJ e nas chaves (`Id` da DPS, chave da NFS-e e do evento), conforme o XSD oficial. O builder já montava o `Id` corretamente; faltava o schema aceitar.
+- **CNPJ alfanumérico** em todos os campos de CNPJ e nas chaves (`Id` da DPS, chave da NFS-e e do evento), conforme o XSD oficial. Está em produção na Sefin Nacional desde 10/08/2026. O builder já montava o `Id` corretamente; faltava o schema aceitar.
 
 ### Pendente (sem schema oficial ainda)
 

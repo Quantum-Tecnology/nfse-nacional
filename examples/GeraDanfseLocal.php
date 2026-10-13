@@ -32,11 +32,12 @@ use QuantumTecnology\NfseNacional\Tools;
  */
 function baixarDanfseOficial(Tools $tools, string $chave, int $tentativas = 3): ?string
 {
-    // O endpoint exige a chave NUMÉRICA de 50 dígitos. A SEFAZ devolve
+    // O endpoint exige a chave de 50 posições, sem prefixo. A SEFAZ devolve
     // `chaveAcesso` com o prefixo "NFS" (decoração do Id do XML) e, com ele,
-    // a consulta volta vazia — um erro silencioso clássico.
-    $digitos = preg_replace('/\D/', '', $chave) ?? '';
-    $chave   = 50 === mb_strlen($digitos) ? $digitos : $chave;
+    // a consulta volta vazia — um erro silencioso clássico. Não usar \D: com
+    // CNPJ alfanumérico a chave tem letras, e \D as apagaria.
+    $limpa = preg_replace('/[^A-Z0-9]/', '', strtoupper(preg_replace('/^NFS/i', '', $chave) ?? '')) ?? '';
+    $chave = 50 === mb_strlen($limpa) ? $limpa : $chave;
 
     for ($tentativa = 1; $tentativa <= $tentativas; ++$tentativa) {
         try {

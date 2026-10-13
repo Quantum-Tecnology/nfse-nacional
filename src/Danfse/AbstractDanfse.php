@@ -2193,14 +2193,18 @@ abstract class AbstractDanfse extends DaCommon
 
     /**
      * Formata CNPJ/CPF
-     * 
+     *
+     * CNPJ alfanumérico (a partir de julho/2026): letras na raiz e na ordem,
+     * dígitos verificadores numéricos. A máscara é a mesma — só não se pode
+     * descartar as letras ao limpar a pontuação.
+     *
      * @param string $doc
      * @return string
      */
     protected function formatarCnpjCpf($doc)
     {
-        $doc = preg_replace('/[^0-9]/', '', $doc);
-        
+        $doc = strtoupper((string) preg_replace('/[^0-9A-Za-z]/', '', (string) $doc));
+
         if (strlen($doc) == 14) {
             // CNPJ: 00.000.000/0000-00
             return substr($doc, 0, 2) . '.' . 

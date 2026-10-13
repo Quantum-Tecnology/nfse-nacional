@@ -155,7 +155,7 @@ O namespace passou a ser **`QuantumTecnology\NfseNacional`**, alinhado aos demai
 > ⚠️ **Breaking change** ao migrar de versões anteriores: troque os `use Hadder\NfseNacional\...` por `use QuantumTecnology\NfseNacional\...`.
 
 ### 🔁 Eventos: cancelamento e cancelamento por substituição
-O `renderEvento()` **nunca gerou XML válido** em versões anteriores: faltava o elemento obrigatório `<nPedRegEvento>` e o atributo `Id` tinha 59 caracteres onde o schema exige 62. Na prática, **nenhum cancelamento era aceito** pelo Ambiente Nacional. Corrigido.
+O pedido de registro de evento segue o XSD oficial v1.01: **sem** `<nPedRegEvento>` (o grupo do evento vem logo depois do `chNFSe`) e `Id` de 59 caracteres — `"PRE"` + chave (50) + tipo do evento (6). Ver a 3.5.0 no CHANGELOG: até ela, o pacote validava contra uma edição antiga do XSD e gerava o elemento.
 
 Além do `e101101` (cancelamento), agora também é gerado o corpo do **`e105102`** (cancelamento por substituição), que antes tinha o código mapeado mas produzia um `infPedReg` sem o grupo do evento.
 
@@ -172,7 +172,7 @@ $std->infPedReg->e105102 = (object) [
 ];
 ```
 
-O `xDesc` **não precisa ser informado** — é enumeração de valor fixo no schema e o pacote o deriva do próprio evento (a grafia do 105102, por exemplo, não leva cedilha). O `nPedRegEvento` assume `1` por padrão; informe-o em `$std->infPedReg->nPedRegEvento` nos eventos que podem se repetir.
+O `xDesc` **não precisa ser informado** — é enumeração de valor fixo no schema e o pacote o deriva do próprio evento e da versão do documento (a grafia do 105102 é acentuada na v1.01 e sem acento na v1.00).
 
 ### 🛡️ Compatibilidade de versão do PHP
 `generateId()` e o cliente HTTP usavam `mb_str_pad()` e `mb_trim()`, **funções exclusivas do PHP 8.4**, enquanto o pacote declara `^8.1`. Em PHP 8.1–8.3 a instalação passava sem aviso e o pacote quebrava na primeira emissão. Trocadas por `str_pad()`/`trim()`.

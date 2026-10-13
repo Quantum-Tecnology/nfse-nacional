@@ -109,6 +109,20 @@ final class SchemaValidatorTest extends TestCase
     }
 
     #[Test]
+    public function aceitaCnpjAlfanumericoNoPrestadorENoId(): void
+    {
+        $std = $this->stdValido();
+
+        $std->infDPS->prest->CNPJ = '12ABC34501DE35';
+
+        $dps = new Dps($std);
+        $xml = $dps->render();
+
+        $this->assertSame([], SchemaValidator::errors($xml, 'DPS'));
+        $this->assertStringContainsString('Id="DPS317020621' . '2ABC34501DE35', $xml);
+    }
+
+    #[Test]
     public function validaOEventoContraOSchemaProprio(): void
     {
         $xml = (new Dps($this->stdEvento()))->renderEvento();

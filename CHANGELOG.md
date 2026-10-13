@@ -8,6 +8,29 @@ O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e o 
 
 > **Nota sobre o histórico.** Este arquivo começa na `3.3.0`. As versões anteriores (24 tags, de `1.0.0` a `3.2.4`) não tinham changelog escrito e não serão reconstruídas a partir do log do Git.
 
+## [3.5.0] — 2026-10-13
+
+### ⚠️ Requer atenção
+
+- **Cancelamento e substituição de NFS-e: o XML do evento mudou.** Saem o elemento `<nPedRegEvento>` e os 3 dígitos finais do `Id` (que volta a ter 59 caracteres). Se a sua integração valida ou monta o evento por fora do pacote, ajuste. O campo `$std->infPedReg->nPedRegEvento`, se ainda vier no payload, é ignorado.
+- **XSDs em subpastas por versão** (`storage/schemes/1.00/`, `storage/schemes/1.01/`), como no pacote oficial. Quem lia os arquivos direto da pasta deve passar a usar `SchemaValidator::schemaPath($documento, $versao)`.
+
+### Corrigido
+
+- **Os XSDs eram uma edição antiga da v1.01, anterior à de produção.** Agora são os oficiais: a v1.00 vem do pacote de produção (`nfse-esquemas_xsd-v1-01-20260209`) e a v1.01 do de produção restrita (`esquemas-nfse-rtc-v1-01-20260727`), que é o de produção mais o CNPJ alfanumérico. Com o XSD antigo, a validação local recusava XML que a Sefin aceita e aceitava XML que ela recusa.
+- **Cancelamento passava na validação local e era recusado pela Sefin Nacional.** A edição antiga exigia `<nPedRegEvento>` e `Id` de 62 caracteres. A 3.x (commit `188f3ac`) passou a gerá-los para "passar no XSD", desfazendo a correção do upstream de jan/2026. O XSD oficial não tem o elemento e limita o `Id` a 59.
+- **`xDesc` do cancelamento por substituição (e105102)** passou a ser "Cancelamento de NFS-e por Substituição", com acento, como na v1.01 oficial. Na v1.00 continua sem acento.
+- **DANFSe apagava as letras do CNPJ alfanumérico** ao formatar o documento: `12ABC34501DE35` saía como `123450135`.
+
+### Adicionado
+
+- **CNPJ alfanumérico** em todos os campos de CNPJ e nas chaves (`Id` da DPS, chave da NFS-e e do evento), conforme o XSD oficial. O builder já montava o `Id` corretamente; faltava o schema aceitar.
+
+### Pendente (sem schema oficial ainda)
+
+- **NT 009 (`gPgtoVinc`, `regApIBSCBSSN`, `cAtvSN`).** A NT 009 v1.01 está publicada, mas nenhum pacote XSD oficial traz esses campos até 13/10/2026: nem o de produção (09/02) nem o de produção restrita (27/07). Entram quando o schema sair.
+- **O XSD oficial se contradiz sobre onde a letra cabe na chave.** O `TSChaveNFSe` aceita letras nas posições 7 a 20, e o `Id` do evento aceita na inscrição, posições 10 a 23. Um CNPJ com letra no 12º caractere (o último da ordem) passa no `Id` e é recusado na chave. Ficou como está no oficial.
+
 ## [3.4.4] — 2026-10-05
 
 ### Alterado

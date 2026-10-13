@@ -9,6 +9,7 @@ use DOMXPath;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use QuantumTecnology\NfseNacional\Dps;
+use QuantumTecnology\NfseNacional\SchemaValidator;
 use ReflectionMethod;
 use ReflectionProperty;
 use stdClass;
@@ -308,7 +309,7 @@ final class RegressaoTest extends TestCase
         $anterior = libxml_use_internal_errors(true);
         libxml_clear_errors();
 
-        $valido = $dom->schemaValidate(__DIR__ . '/../storage/schemes/DPS_v1.01.xsd');
+        $valido = $dom->schemaValidate(SchemaValidator::schemaPath('DPS', '1.01'));
         $erros  = array_map(static fn ($e) => trim($e->message), libxml_get_errors());
 
         libxml_clear_errors();

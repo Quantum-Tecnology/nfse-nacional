@@ -609,8 +609,10 @@ class Dps implements DpsInterface
             true
         );
 
-        // cNBS é OBRIGATÓRIO no XSD (TCCodServico, minOccurs default = 1). Emitir
-        // sem ele gera rejeição L2103 na SEFAZ, então não vai sob isset.
+        // cNBS virou minOccurs="0" no XSD oficial v1.01, mas o pacote mantém a
+        // emissão sempre: a NBS classifica o serviço para o IBS/CBS e omiti-la por
+        // esquecimento é pior que ser avisado. Sem valor sai a tag vazia, e a
+        // validação local aponta o campo antes de transmitir.
         $this->dom->addChild(
             $cserv_inner,
             'cNBS',
@@ -1647,15 +1649,9 @@ class Dps implements DpsInterface
             true
         );
 
-        // nPedRegEvento é obrigatório (XSD TCInfPedReg) e vem entre chNFSe e o
-        // grupo do evento. Para eventos que ocorrem uma única vez — cancelamento —
-        // vale 1; nos repetíveis, precisa ser único por tipo de evento.
-        $this->dom->addChild(
-            $infpedreg_inner,
-            'nPedRegEvento',
-            $this->numeroPedidoEvento(),
-            true
-        );
+        // Sem <nPedRegEvento>: o XSD oficial v1.01 (produção 09/02/2026 e
+        // homologação 27/07/2026) o removeu do TCInfPedReg — o grupo do evento
+        // vem logo depois do chNFSe. Ele só existia na edição antiga do XSD.
 
         if (isset($this->std->infpedreg->e101101)) {
             $e101101_inner = $this->dom->createElement('e101101');
@@ -1687,11 +1683,14 @@ class Dps implements DpsInterface
             $e105102_inner = $this->dom->createElement('e105102');
             $infpedreg_inner->appendChild($e105102_inner);
 
-            // Grafia sem cedilha/til é a do XSD — não "corrigir".
+            // Enumeração de valor fixo, e a grafia muda com a versão do XSD:
+            // a v1.00 é sem cedilha/til, a v1.01 oficial é acentuada.
             $this->dom->addChild(
                 $e105102_inner,
                 'xDesc',
-                'Cancelamento de NFS-e por Substituicao',
+                '1.00' === $this->std->version
+                    ? 'Cancelamento de NFS-e por Substituicao'
+                    : 'Cancelamento de NFS-e por Substituição',
                 true
             );
             $this->dom->addChild(
@@ -2004,26 +2003,15 @@ class Dps implements DpsInterface
         return $string;
     }
 
-    /**
-     * Número do pedido de registro do evento.
-     *
-     * Default 1: cancelamento ocorre uma única vez por NFS-e. Eventos repetíveis
-     * precisam informar um número único por tipo.
-     */
-    private function numeroPedidoEvento(): string
-    {
-        return (string) ($this->std->infpedreg->npedregevento ?? 1);
-    }
-
     private function generatePre()
     {
-        // XSD TSIdPedRefEvt: "PRE" + chave(50) + tipo do evento(6) + nPedRegEvento(3),
-        // totalizando 62 chars. O nPedRegEvento vai zero-padded aqui, mas o elemento
-        // <nPedRegEvento> é TSNum3Dig e NÃO aceita zero à esquerda.
+        // XSD TSIdPedRegEvt: "PRE" + chave(50) + tipo do evento(6) = 59 chars
+        // (maxLength 59). A documentação do próprio XSD ainda cita o
+        // nPedRegEvento no fim, mas o pattern e o maxLength não comportam — vale
+        // o pattern, que é o que a validação aplica.
         $string = 'PRE';
         $string .= $this->std->infpedreg->chnfse ?? ''; // Chave de acesso da NFS-e (50) +
-        $string .= $this->codigoEvento(); // Código do evento (6) +
-        $string .= str_pad($this->numeroPedidoEvento(), 3, '0', STR_PAD_LEFT); // nPedRegEvento (3)
+        $string .= $this->codigoEvento(); // Código do evento (6)
         $this->preId = $string;
 
         return $string;
